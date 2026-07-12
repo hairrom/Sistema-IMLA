@@ -73,23 +73,42 @@ def set_background(image_file):
             """, unsafe_allow_html=True)
 
 # ==========================================
-# ÁREA PÚBLICA (LOGIN COMPACTO E BRANCO)
+# ÁREA PÚBLICA (LOGIN COMPACTO)
 # ==========================================
 if st.session_state.usuario_logado is None:
     set_background("IMG_3987.JPG") 
 
-    # CSS Específico para forçar o texto branco e layout compacto no card
+    # CSS Ajustado: Caixas brancas com texto preto, botões com texto preto, labels brancas
     st.markdown("""
         <style>
         .login-container { margin-top: -30px; }
+        
+        /* Ajuste das caixas de texto (inputs) */
         .stTextInput>div>div>input { 
-            background-color: rgba(255, 255, 255, 0.1) !important; 
-            border: 1px solid rgba(255,255,255,0.4) !important; 
-            color: white !important; 
+            background-color: #ffffff !important; 
+            border: 1px solid #cccccc !important; 
+            color: #000000 !important; /* TEXTO PRETO */
         }
-        .stSelectbox>div>div>div { background-color: rgba(255, 255, 255, 0.1) !important; color: white !important; }
-        p, span, label, h2, h4 { color: white !important; }
-        .stButton>button { border-radius: 12px; font-weight: bold; }
+        
+        /* Ajuste do menu suspenso (selectbox) */
+        .stSelectbox>div>div>div { 
+            background-color: #ffffff !important; 
+            color: #000000 !important; /* TEXTO PRETO */
+        }
+        
+        /* Ajuste dos textos externos (labels e títulos) */
+        p, label, h2, h4 { color: white !important; }
+        
+        /* Ajuste dos Botões */
+        .stButton>button { 
+            border-radius: 12px; 
+            font-weight: bold; 
+            background-color: #ffffff !important;
+            color: #000000 !important; /* TEXTO PRETO */
+        }
+        .stButton>button * {
+            color: #000000 !important; /* Força tudo dentro do botão a ser preto */
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -97,7 +116,7 @@ if st.session_state.usuario_logado is None:
     
     with col2:
         st.markdown("<div class='login-container'>", unsafe_allow_html=True)
-        st.write("") # Margem mínima
+        st.write("") 
         
         caminho_logo = "Logotipo Principal 01 (1).png"
         if os.path.exists(caminho_logo):
@@ -105,42 +124,44 @@ if st.session_state.usuario_logado is None:
         else:
             st.markdown("<h2 style='text-align:center;'>Mãe Lalu</h2>", unsafe_allow_html=True)
         
+        # TELA DE LOGIN
         if st.session_state.modo_tela == "login":
-            st.markdown("<h4 style='text-align:center; font-size:18px;'>Acesso ao Hub</h4>", unsafe_allow_html=True)
-            usuario_login = st.text_input("Seu Nome:")
+            st.markdown("<h4 style='text-align:center; font-size:18px;'>Acesso ao sistema IMLA</h4>", unsafe_allow_html=True)
+            usuario_email = st.text_input("Seu Email:")
             senha_login = st.text_input("Senha:", type="password")
             
             if st.button("Entrar", use_container_width=True):
-                if usuario_login in st.session_state.usuarios:
-                    if st.session_state.usuarios[usuario_login]["senha"] == senha_login:
-                        st.session_state.usuario_logado = st.session_state.usuarios[usuario_login]
-                        st.session_state.nucleo_selecionado = st.session_state.usuarios[usuario_login]["nucleo"]
+                if usuario_email in st.session_state.usuarios:
+                    if st.session_state.usuarios[usuario_email]["senha"] == senha_login:
+                        st.session_state.usuario_logado = st.session_state.usuarios[usuario_email]
+                        st.session_state.nucleo_selecionado = st.session_state.usuarios[usuario_email]["nucleo"]
                         st.rerun()
                     else: st.error("Senha incorreta.")
-                else: st.error("Usuário não encontrado.")
+                else: st.error("Email não encontrado.")
             
             st.markdown("<p style='text-align:center; font-size:12px; margin-top:10px;'>Ainda não tem acesso?</p>", unsafe_allow_html=True)
             if st.button("Criar nova conta", use_container_width=True):
                 st.session_state.modo_tela = "cadastro"
                 st.rerun()
 
+        # TELA DE CADASTRO
         else:
             st.markdown("<h4 style='text-align:center; font-size:18px;'>Novo Cadastro</h4>", unsafe_allow_html=True)
-            novo_nome = st.text_input("Nome Completo:")
+            novo_email = st.text_input("Seu Email:")
             novo_nucleo = st.selectbox("Seu Núcleo:", list(st.session_state.nucleos_dados.keys()))
             nova_senha = st.text_input("Crie uma Senha:", type="password")
             
             if st.button("Finalizar Cadastro", use_container_width=True):
-                if novo_nome.strip() and nova_senha.strip():
-                    if novo_nome in st.session_state.usuarios:
-                        st.warning("Usuário já existe.")
+                if novo_email.strip() and nova_senha.strip():
+                    if novo_email in st.session_state.usuarios:
+                        st.warning("Este email já está cadastrado.")
                     else:
-                        st.session_state.usuarios[novo_nome] = {"nome": novo_nome, "nucleo": novo_nucleo, "senha": nova_senha}
-                        salvar_banco() # Salva no JSON imediatamente
+                        st.session_state.usuarios[novo_email] = {"email": novo_email, "nucleo": novo_nucleo, "senha": nova_senha}
+                        salvar_banco()
                         st.success("Cadastro realizado!")
                         st.session_state.modo_tela = "login"
                         st.rerun()
-                else: st.error("Preencha tudo.")
+                else: st.error("Preencha todos os campos.")
 
             if st.button("Voltar", use_container_width=True):
                 st.session_state.modo_tela = "login"
@@ -148,7 +169,7 @@ if st.session_state.usuario_logado is None:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# ÁREA PRIVADA (ESTÉTICA MINIMALISTA)
+# ÁREA PRIVADA (SISTEMA INTERNO)
 # ==========================================
 else:
     st.markdown("""
@@ -158,7 +179,6 @@ else:
         h1 { font-weight: 600 !important; font-family: -apple-system, BlinkMacSystemFont, sans-serif !important; color: #1d1d1f !important; }
         h2, h3, h4, p, span { color: #1d1d1f !important; font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;}
         
-        /* Estilo dos Botões da Árvore de Navegação */
         div.stButton > button:first-child {
             background-color: transparent; border: none; box-shadow: none; padding: 10px;
             color: #1d1d1f !important; border-radius: 15px; transition: 0.2s;
@@ -166,7 +186,6 @@ else:
         div.stButton > button:first-child:hover { background-color: rgba(0,0,0,0.05); }
         div.stButton > button:first-child p { font-size: 13px !important; margin: 0; font-weight: 500;}
         
-        /* Cards Estilo Apple para o Feed */
         .apple-card {
             background: #ffffff; border-radius: 20px; padding: 25px; margin-bottom: 20px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.04);
@@ -178,7 +197,6 @@ else:
         </style>
     """, unsafe_allow_html=True)
 
-    # CABEÇALHO / LOGOUT
     col_topo1, col_topo2 = st.columns([8, 2])
     with col_topo1: st.title("Hub Operacional")
     with col_topo2:
@@ -191,18 +209,13 @@ else:
 
     def set_nucleo(n): st.session_state.nucleo_selecionado = n
 
-    # ÁRVORE GENEALÓGICA / MENU ESTILO APPLE ICONS
     st.write("")
-    
-    # Nível 1 - Central (Logo)
     c1, c2, c3 = st.columns([2, 1, 2])
     with c2:
         if os.path.exists("Logotipo Principal 01 (1).png"):
             st.image("Logotipo Principal 01 (1).png", use_container_width=True)
     st.write("")
 
-    # Nível 2 - Núcleos (Ícones Grandes + Texto Embaixo)
-    # A quebra de linha \n no botão gera o visual de ícone em cima e texto embaixo
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     with col1:
         if st.button("🍳\nCozinha", use_container_width=True): set_nucleo("Cozinha e Nutrição")
@@ -224,14 +237,13 @@ else:
 
     aba_feed, aba_tarefas, aba_solicitacoes = st.tabs(["As novidades", "Demandas", "Solicitações"])
 
-    # ABA 1: FEED ESTILO CARDS
     with aba_feed:
         if st.session_state.usuario_logado['nucleo'] == n_sel:
             with st.form("form_novo"):
                 texto = st.text_area("Compartilhar algo novo:")
                 if st.form_submit_button("Publicar") and texto.strip():
                     agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-                    autor = st.session_state.usuario_logado['nome']
+                    autor = st.session_state.usuario_logado['email']
                     st.session_state.nucleos_dados[n_sel]["atualizacoes"].insert(0, {"texto": texto, "data": agora, "autor": autor})
                     salvar_banco()
                     st.rerun()
@@ -240,7 +252,6 @@ else:
         col_c1, col_c2, col_c3 = st.columns(3)
         posts = st.session_state.nucleos_dados[n_sel]["atualizacoes"]
         
-        # Distribui os posts em 3 colunas simulando os produtos da Apple
         for i, p in enumerate(posts):
             col = [col_c1, col_c2, col_c3][i % 3]
             with col:
@@ -253,7 +264,6 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
 
-    # ABA 2: TAREFAS E LINKS
     with aba_tarefas:
         c_link1, c_link2 = st.columns(2)
         c_link1.link_button("📂 Acessar Drive", st.session_state.nucleos_dados[n_sel]["drive"])
@@ -270,7 +280,6 @@ else:
         for t in st.session_state.nucleos_dados[n_sel]["tarefas"]:
             st.checkbox(t, key=f"check_{t}")
 
-    # ABA 3: SOLICITAÇÕES
     with aba_solicitacoes:
         with st.form("form_sol"):
             dest = st.selectbox("Para qual núcleo?", list(st.session_state.nucleos_dados.keys()))
@@ -278,7 +287,7 @@ else:
             msg = st.text_area("Mensagem:")
             if st.form_submit_button("Enviar") and assunto.strip():
                 agora = datetime.datetime.now().strftime("%d/%m/%Y")
-                remetente = st.session_state.usuario_logado['nome']
+                remetente = st.session_state.usuario_logado['email']
                 st.session_state.caixa_entrada[dest].append({"assunto": assunto, "mensagem": msg, "data": agora, "de": remetente})
                 salvar_banco()
                 st.success("Enviado com sucesso!")
