@@ -9,6 +9,7 @@ import uuid
 import hashlib
 import secrets
 from PIL import Image
+import streamlit.components.v1 as components
 
 FUSO_BR = ZoneInfo("America/Bahia")
 
@@ -64,6 +65,7 @@ TEXTOS = {
         "titulo_sistema": "Sistema IMLA",
         "subtitulo": "Onde nós trabalhamos",
         "sair": "Sair",
+        "encolher": "Encolher",
         "perfil": "Perfil",
         "logado_como": "Conectado como",
         "nucleo_label": "Núcleo",
@@ -77,6 +79,7 @@ TEXTOS = {
         "publicar": "Publicar",
         "acessar_drive": "📂 Acessar Drive",
         "cronogramas": "📊 Cronogramas",
+        "restrito_links": "🔒 Faça login para acessar o Drive e as planilhas.",
         "nova_demanda": "Nova demanda",
         "titulo_demanda": "Título da demanda",
         "descricao_demanda": "Descrição (o que precisa ser feito)",
@@ -93,7 +96,7 @@ TEXTOS = {
         "titulo_lembrete": "Nome da tarefa recorrente",
         "descricao_lembrete": "O que precisa ser feito",
         "proxima_data": "Próxima data",
-        "adicionar_lembrete": "+ Adicionar lembrete",
+        "adicionar_lembrete": "💾 Salvar",
         "sem_lembretes": "Nenhum lembrete cadastrado.",
         "enviar_solicitacao": "Enviar solicitação",
         "para_nucleo": "Para qual núcleo?",
@@ -113,6 +116,7 @@ TEXTOS = {
         "titulo_sistema": "IMLA System",
         "subtitulo": "Where we work",
         "sair": "Log out",
+        "encolher": "Collapse",
         "perfil": "Profile",
         "logado_como": "Signed in as",
         "nucleo_label": "Team",
@@ -126,6 +130,7 @@ TEXTOS = {
         "publicar": "Post",
         "acessar_drive": "📂 Open Drive",
         "cronogramas": "📊 Timelines",
+        "restrito_links": "🔒 Log in to access Drive and spreadsheets.",
         "nova_demanda": "New task",
         "titulo_demanda": "Task title",
         "descricao_demanda": "Description (what needs to be done)",
@@ -142,7 +147,7 @@ TEXTOS = {
         "titulo_lembrete": "Recurring task name",
         "descricao_lembrete": "What needs to be done",
         "proxima_data": "Next date",
-        "adicionar_lembrete": "+ Add reminder",
+        "adicionar_lembrete": "💾 Save",
         "sem_lembretes": "No reminders yet.",
         "enviar_solicitacao": "Send request",
         "para_nucleo": "Which team?",
@@ -259,6 +264,7 @@ if "modo_tela" not in st.session_state: st.session_state.modo_tela = "login"
 if "nucleo_selecionado" not in st.session_state: st.session_state.nucleo_selecionado = "Comunicação"
 if "idioma" not in st.session_state: st.session_state.idioma = "pt"
 if "busca" not in st.session_state: st.session_state.busca = ""
+if "mostrar_perfil" not in st.session_state: st.session_state.mostrar_perfil = False
 
 
 # ==========================================
@@ -308,21 +314,6 @@ def banner_base64(caminho, proporcao=21 / 6):
     buf = io.BytesIO()
     recorte.save(buf, format="JPEG", quality=88)
     return base64.b64encode(buf.getvalue()).decode()
-
-
-# ==========================================
-# 4. PROCESSA PARÂMETROS DE NAVEGAÇÃO (barra flutuante em HTML puro)
-# ==========================================
-qp = st.query_params
-
-if st.session_state.usuario_logado is not None:
-    if qp.get("acao") == "sair":
-        st.session_state.usuario_logado = None
-        st.query_params.clear()
-        st.rerun()
-
-    if "nucleo" in qp and qp.get("nucleo") in NUCLEOS_INFO:
-        st.session_state.nucleo_selecionado = qp.get("nucleo")
 
 
 # ==========================================
@@ -474,10 +465,10 @@ else:
     logo_simbolo_b64 = logo_simbolo_base64(LOGO_PATH)
     banner_b64 = banner_base64(BANNER_PATH)
     iniciais = "".join([p[0].upper() for p in usuario["nome"].split()[:2]]) or "?"
+    eh_visitante = bool(usuario.get("visitante"))
 
-    # Camada extra de dificuldade contra inspeção casual (não é segurança real:
-    # ver seção de segurança na resposta para detalhes e limites disso).
-    st.iframe("""
+    # Camada extra de dificuldade contra inspeção casual (não é segurança real).
+    components.html("""
     <script>
     (function() {
         try {
@@ -491,7 +482,7 @@ else:
         } catch (err) {}
     })();
     </script>
-    """, height=1, width=1)
+    """, height=0, width=0)
 
     st.markdown(f"""
         <style>
@@ -501,89 +492,92 @@ else:
         html, body, [class*="css"] {{
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, Arial, sans-serif !important;
         }}
-        h1 {{ font-weight: 600 !important; color: #1d1d1f !important; }}
         h2, h3, h4, p, span {{ color: #1d1d1f !important; }}
 
-        .block-container {{ padding-top: 0rem !important; }}
+        .block-container {{ padding-top: 0.5rem !important; }}
 
-        /* ---------- ILHA FLUTUANTE (NAVBAR) ---------- */
-        .ilha-flutuante {{
-            position: fixed;
-            top: 14px; left: 50%;
-            transform: translateX(-50%);
-            width: min(96%, 1200px);
+        /* ---------- NAVBAR (agora com botões reais do Streamlit, sem reload de página) ---------- */
+        div[data-testid="stVerticalBlock"]:has(> div.element-container > div.stMarkdown > div > div.navbar-anchor) {{
+            display: none;
+        }}
+
+        .st-key-navbar_container {{
+            position: sticky;
+            top: 8px;
             z-index: 9999;
-            background: rgba(255,255,255,0.78);
+            background: rgba(255,255,255,0.9);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border-radius: 26px;
-            border: 1px solid rgba(255,255,255,0.4);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.18);
-            padding: 8px 16px;
-            display: flex; align-items: center; gap: 10px;
-            flex-wrap: wrap;
-            row-gap: 8px;
+            border-radius: 24px;
+            border: 1px solid rgba(0,0,0,0.06);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.14);
+            padding: 10px 16px;
+            margin-bottom: 18px;
         }}
-        .ilha-logo {{ height: 30px; border-radius: 8px; flex-shrink:0; }}
-        .ilha-pills {{ display:flex; gap:5px; flex-wrap: wrap; }}
-        .ilha-pill,
-        .ilha-pill:link,
-        .ilha-pill:visited,
-        .ilha-pill:hover,
-        .ilha-pill:active {{
-            text-decoration:none !important;
-            border-bottom:none !important;
-            box-shadow:none;
+        .st-key-navbar_container .stButton>button {{
+            border-radius: 980px !important;
+            font-size: 12.5px !important;
+            font-weight: 600 !important;
+            padding: 0.4rem 0.9rem !important;
+            border: none !important;
+            white-space: nowrap;
         }}
-        .ilha-pill {{
-            font-size:12px; font-weight:600; color:#1d1d1f !important;
-            background: rgba(0,0,0,0.05); padding:6px 11px; border-radius:980px; white-space:nowrap;
-            transition: 0.15s;
+        .st-key-navbar_container button[kind="secondary"] {{
+            background-color: rgba(0,0,0,0.05) !important;
+            color: #1d1d1f !important;
         }}
-        .ilha-pill:hover {{ background: rgba(0,0,0,0.1); }}
-        .ilha-pill.ativa {{ background:#1d1d1f; color:#ffffff !important; }}
-        .ilha-perfil {{ margin-left: auto; flex-shrink:0; position: relative; }}
-        .ilha-perfil summary {{
-            list-style:none; cursor:pointer; width:34px; height:34px; border-radius:50%;
-            background:#0071e3; color:white !important; display:flex; align-items:center; justify-content:center;
-            font-size:12px; font-weight:700;
+        .st-key-navbar_container button[kind="secondary"]:hover {{
+            background-color: rgba(0,0,0,0.1) !important;
         }}
-        .ilha-perfil summary::-webkit-details-marker {{ display:none; }}
-        .ilha-perfil[open] summary {{ background:#004c99; }}
-        .painel-perfil {{
-            position:absolute; right:0; top:44px; background:white; border-radius:16px;
-            box-shadow:0 12px 34px rgba(0,0,0,0.25); padding:16px 18px; width:230px; text-align:left;
+        .st-key-navbar_container button[kind="primary"] {{
+            background-color: #1d1d1f !important;
+            color: #ffffff !important;
+        }}
+        .st-key-perfil_btn_col .stButton>button {{
+            border-radius: 50% !important;
+            width: 38px !important; height: 38px !important;
+            padding: 0 !important;
+            background-color: #0071e3 !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            border: none !important;
+        }}
+
+        .st-key-perfil_painel {{
+            position: fixed;
+            top: 74px; right: 22px;
             z-index: 10000;
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 12px 34px rgba(0,0,0,0.25);
+            padding: 16px 18px;
+            width: 240px;
         }}
-        .painel-perfil .nome {{ font-weight:700; font-size:14px; color:#1d1d1f; }}
-        .painel-perfil .info {{ font-size:12px; color:#6e6e73; margin-top:2px; }}
-        .painel-perfil a.sair {{
-            display:block; margin-top:12px; text-align:center; background:#ff3b30; color:white !important;
-            text-decoration:none; padding:7px; border-radius:980px; font-size:12.5px; font-weight:600;
+        .st-key-perfil_painel .stButton>button {{
+            border-radius: 980px !important;
+            font-size: 12.5px !important;
+            padding: 0.35rem 0 !important;
         }}
 
         /* ---------- BANNER ---------- */
         .banner-imla {{
-            margin-top: 76px;
             width: 100%; height: 240px; border-radius: 24px; overflow:hidden;
-            background-image: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.7)), url(data:image/jpeg;base64,{banner_b64 if banner_b64 else ''});
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.75)), url(data:image/jpeg;base64,{banner_b64 if banner_b64 else ''});
             background-size: cover; background-position: center;
             display:flex; align-items:flex-end; padding: 26px 34px;
         }}
         .banner-imla h1 {{
-            color:#ffffff !important; font-size: 40px; margin:0; font-weight:700;
-            text-shadow: 0 2px 12px rgba(0,0,0,0.55);
+            color:#ffffff !important; font-size: 40px; margin:0; font-weight:700 !important;
+            text-shadow: 0 2px 14px rgba(0,0,0,0.7);
         }}
         .banner-imla p {{
-            color: #ffffff !important; margin:0; font-size:15px; opacity:0.92;
-            text-shadow: 0 1px 8px rgba(0,0,0,0.5);
+            color: #ffffff !important; margin:0; font-size:15px; opacity:0.95;
+            text-shadow: 0 1px 10px rgba(0,0,0,0.65);
         }}
 
         div.stButton > button:first-child {{
-            background-color: transparent; border: none; box-shadow: none; padding: 10px;
-            color: #1d1d1f !important; border-radius: 15px; transition: 0.2s;
+            transition: 0.2s;
         }}
-        div.stButton > button:first-child:hover {{ background-color: rgba(0,0,0,0.05); }}
 
         .apple-card {{
             background: #ffffff; border-radius: 20px; padding: 22px; margin-bottom: 18px;
@@ -622,14 +616,19 @@ else:
         }}
         .lembrete-data.atrasado {{ color:#ff3b30; background:rgba(255,59,48,0.1); }}
 
+        /* ---------- ABAS: impede corte/truncamento de texto ---------- */
+        .stTabs [data-baseweb="tab"] {{
+            white-space: nowrap !important;
+            padding: 0 16px !important;
+        }}
+        .stTabs [data-baseweb="tab-list"] {{
+            overflow-x: auto !important;
+        }}
+
         /* ---------- RESPONSIVO (CELULAR) ---------- */
         @media (max-width: 700px) {{
-            .ilha-flutuante {{ padding: 6px 10px; gap: 6px; border-radius: 20px; top: 8px; }}
-            .ilha-logo {{ height: 24px; }}
-            .ilha-pill {{ padding: 6px 9px; }}
-            .ilha-pill .rotulo {{ display:none; }}
-            .ilha-perfil summary {{ width: 28px; height: 28px; font-size: 10px; }}
-            .banner-imla {{ margin-top: 60px; height: 190px; padding: 18px 20px; border-radius:18px; }}
+            .st-key-navbar_container {{ padding: 6px 10px; border-radius: 20px; top: 4px; }}
+            .banner-imla {{ height: 190px; padding: 18px 20px; border-radius:18px; }}
             .banner-imla h1 {{ font-size: 26px; }}
             .banner-imla p {{ font-size: 12px; }}
         }}
@@ -637,45 +636,52 @@ else:
         </style>
     """, unsafe_allow_html=True)
 
-    # ---------- MONTA A ILHA FLUTUANTE (HTML puro, navegação via query params) ----------
-    eh_visitante = bool(usuario.get("visitante"))
+    # ---------- NAVBAR (contêiner real do Streamlit, sem <a href> nem reload) ----------
+    with st.container(key="navbar_container"):
+        n_nucleos = len(NUCLEOS_INFO)
+        larguras = [0.7] + [1] * n_nucleos + [0.5]
+        cols = st.columns(larguras, vertical_alignment="center")
 
-    pills_html = ""
-    for nome, emoji in NUCLEOS_INFO.items():
-        ativa = "ativa" if nome == n_sel else ""
-        pills_html += f'<a class="ilha-pill {ativa}" href="?nucleo={nome}">{emoji}<span class="rotulo"> {nome}</span></a>'
+        with cols[0]:
+            if logo_simbolo_b64:
+                st.image(f"data:image/png;base64,{logo_simbolo_b64}")
 
-    logo_tag = f'<img class="ilha-logo" src="data:image/png;base64,{logo_simbolo_b64}">' if logo_simbolo_b64 else ""
+        for i, (nome, emoji) in enumerate(NUCLEOS_INFO.items(), start=1):
+            with cols[i]:
+                tipo_botao = "primary" if nome == n_sel else "secondary"
+                if st.button(f"{emoji} {nome}", key=f"nuc_{nome}", type=tipo_botao, use_container_width=True):
+                    st.session_state.nucleo_selecionado = nome
+                    st.session_state.mostrar_perfil = False
+                    st.rerun()
 
-    if eh_visitante:
-        painel_perfil_html = f"""
-            <div class="painel-perfil">
-                <div class="nome">👁️ Modo Visitante</div>
-                <div class="info">Você está vendo o sistema apenas para leitura.</div>
-                <a class="sair" href="?acao=sair">Sair do modo visitante</a>
-            </div>
-        """
-    else:
-        painel_perfil_html = f"""
-            <div class="painel-perfil">
-                <div class="nome">{usuario['nome']}</div>
-                <div class="info">{t('email_label')}: {usuario['email']}</div>
-                <div class="info">{t('nucleo_label')}: {NUCLEOS_INFO.get(usuario['nucleo'],'')} {usuario['nucleo']}</div>
-                <a class="sair" href="?acao=sair">{t('sair')}</a>
-            </div>
-        """
+        with cols[-1]:
+            with st.container(key="perfil_btn_col"):
+                rotulo_avatar = "👁️" if eh_visitante else iniciais
+                if st.button(rotulo_avatar, key="btn_abrir_perfil"):
+                    st.session_state.mostrar_perfil = not st.session_state.mostrar_perfil
+                    st.rerun()
 
-    navbar_html = f"""
-    <div class="ilha-flutuante">
-        {logo_tag}
-        <div class="ilha-pills">{pills_html}</div>
-        <details class="ilha-perfil">
-            <summary>{"👁️" if eh_visitante else iniciais}</summary>
-            {painel_perfil_html}
-        </details>
-    </div>
-    """
-    st.markdown(navbar_html, unsafe_allow_html=True)
+    # ---------- PAINEL DE PERFIL (aparece/some com botão, sem bug de HTML cru) ----------
+    if st.session_state.mostrar_perfil:
+        with st.container(key="perfil_painel"):
+            if eh_visitante:
+                st.markdown("**👁️ Modo Visitante**")
+                st.caption("Você está vendo o sistema apenas para leitura.")
+            else:
+                st.markdown(f"**{usuario['nome']}**")
+                st.caption(f"{t('email_label')}: {usuario['email']}")
+                st.caption(f"{t('nucleo_label')}: {NUCLEOS_INFO.get(usuario['nucleo'],'')} {usuario['nucleo']}")
+
+            c_enc, c_sair = st.columns(2)
+            with c_enc:
+                if st.button(t("encolher"), key="btn_encolher", use_container_width=True):
+                    st.session_state.mostrar_perfil = False
+                    st.rerun()
+            with c_sair:
+                if st.button(t("sair"), key="btn_sair", use_container_width=True, type="primary"):
+                    st.session_state.usuario_logado = None
+                    st.session_state.mostrar_perfil = False
+                    st.rerun()
 
     # ---------- BANNER ----------
     st.markdown(f"""
@@ -695,7 +701,12 @@ else:
         [t("aba_novidades"), t("aba_tarefas"), t("aba_lembretes"), t("aba_solicitacoes")]
     )
 
-    pode_editar = (not eh_visitante) and (usuario["nucleo"] == n_sel)
+    # ---------- PERMISSÕES ----------
+    # pode_editar: só quem fez login E está vendo o próprio núcleo pode criar/editar/excluir.
+    pode_editar = (not eh_visitante) and (usuario.get("nucleo") == n_sel)
+    # pode_ver_links: qualquer pessoa logada pode abrir Drive/Planilhas em qualquer núcleo,
+    # mas o visitante nunca pode.
+    pode_ver_links = not eh_visitante
 
     # ================= ABA NOVIDADES =================
     with aba_feed:
@@ -734,9 +745,12 @@ else:
 
     # ================= ABA TAREFAS (ESTILO TRELLO) =================
     with aba_tarefas:
-        c_link1, c_link2 = st.columns(2)
-        c_link1.link_button(t("acessar_drive"), st.session_state.nucleos_dados[n_sel]["drive"])
-        c_link2.link_button(t("cronogramas"), st.session_state.nucleos_dados[n_sel]["planilha"])
+        if pode_ver_links:
+            c_link1, c_link2 = st.columns(2)
+            c_link1.link_button(t("acessar_drive"), st.session_state.nucleos_dados[n_sel]["drive"])
+            c_link2.link_button(t("cronogramas"), st.session_state.nucleos_dados[n_sel]["planilha"])
+        else:
+            st.caption(t("restrito_links"))
         st.divider()
 
         if pode_editar:
@@ -870,7 +884,7 @@ else:
                             data_atual = datetime.date.today()
                         data_edit = st.date_input(t("proxima_data"), value=data_atual, key=f"ldt_{lm['id']}")
                         col_s, col_e = st.columns(2)
-                        salvar_lm = col_s.form_submit_button(t("salvar"))
+                        salvar_lm = col_s.form_submit_button(t("adicionar_lembrete"))
                         excluir_lm = col_e.form_submit_button(t("excluir_lembrete"))
                         if salvar_lm:
                             lm["titulo"] = tit_edit.strip() or lm["titulo"]
