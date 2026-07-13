@@ -1,11 +1,34 @@
 import streamlit as st
 import datetime
+from zoneinfo import ZoneInfo
 import os
 import json
 import base64
 import io
 import uuid
+import hashlib
+import secrets
 from PIL import Image
+
+FUSO_BR = ZoneInfo("America/Bahia")
+
+
+def agora_br():
+    """Retorna a data/hora certa do Brasil (Bahia), independente do fuso do servidor."""
+    return datetime.datetime.now(FUSO_BR)
+
+
+def hash_senha(senha, salt=None):
+    """Gera um hash seguro (PBKDF2) da senha, nunca guardando a senha em texto puro."""
+    if salt is None:
+        salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", senha.encode("utf-8"), salt.encode("utf-8"), 200_000)
+    return salt, h.hex()
+
+
+def verificar_senha(senha, salt, hash_esperado):
+    _, h = hash_senha(senha, salt)
+    return secrets.compare_digest(h, hash_esperado)
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -18,7 +41,7 @@ st.set_page_config(
 )
 
 ARQUIVO_BANCO = "banco_iml.json"
-LOGO_PATH = "Logotipo Principal 01 (1).png"
+LOGO_PATH = "Submarca 01.png"
 LOGIN_BG_PATH = "IMG_3987.JPG"
 BANNER_PATH = "IMG_3985.JPG"
 
@@ -48,6 +71,7 @@ TEXTOS = {
         "buscar_placeholder": "Buscar...",
         "aba_novidades": "As novidades",
         "aba_tarefas": "Demandas",
+        "aba_lembretes": "Lembretes",
         "aba_solicitacoes": "Solicitações",
         "compartilhar": "Compartilhar algo novo",
         "publicar": "Publicar",
@@ -61,16 +85,28 @@ TEXTOS = {
         "criado_por": "Criado por",
         "editar": "✏️ Editar",
         "salvar": "Salvar alterações",
+        "excluir_tarefa": "🗑️ Excluir tarefa",
+        "excluir_lembrete": "🗑️ Excluir lembrete",
         "status": "Status",
         "restrito_edicao": "🔒 Apenas membros deste núcleo podem editar.",
+        "novo_lembrete": "Novo lembrete",
+        "titulo_lembrete": "Nome da tarefa recorrente",
+        "descricao_lembrete": "O que precisa ser feito",
+        "proxima_data": "Próxima data",
+        "adicionar_lembrete": "+ Adicionar lembrete",
+        "sem_lembretes": "Nenhum lembrete cadastrado.",
         "enviar_solicitacao": "Enviar solicitação",
         "para_nucleo": "Para qual núcleo?",
         "assunto": "Assunto",
         "mensagem": "Mensagem",
+        "visibilidade": "Visibilidade",
+        "publica": "Pública (todos podem ver)",
+        "privada": "Privada (só o núcleo destino)",
         "enviar": "Enviar",
         "enviado": "Enviado com sucesso!",
         "caixa_entrada": "Caixa de Entrada",
         "restrito_caixa": "🔒 Restrito aos membros deste núcleo.",
+        "visitante_solicitacoes": "👁️ Você está vendo apenas as solicitações públicas deste núcleo.",
         "de": "De",
     },
     "en": {
@@ -84,6 +120,7 @@ TEXTOS = {
         "buscar_placeholder": "Search...",
         "aba_novidades": "Updates",
         "aba_tarefas": "Tasks",
+        "aba_lembretes": "Reminders",
         "aba_solicitacoes": "Requests",
         "compartilhar": "Share something new",
         "publicar": "Post",
@@ -97,16 +134,28 @@ TEXTOS = {
         "criado_por": "Created by",
         "editar": "✏️ Edit",
         "salvar": "Save changes",
+        "excluir_tarefa": "🗑️ Delete task",
+        "excluir_lembrete": "🗑️ Delete reminder",
         "status": "Status",
         "restrito_edicao": "🔒 Only members of this team can edit.",
+        "novo_lembrete": "New reminder",
+        "titulo_lembrete": "Recurring task name",
+        "descricao_lembrete": "What needs to be done",
+        "proxima_data": "Next date",
+        "adicionar_lembrete": "+ Add reminder",
+        "sem_lembretes": "No reminders yet.",
         "enviar_solicitacao": "Send request",
         "para_nucleo": "Which team?",
         "assunto": "Subject",
         "mensagem": "Message",
+        "visibilidade": "Visibility",
+        "publica": "Public (everyone can see)",
+        "privada": "Private (destination team only)",
         "enviar": "Send",
         "enviado": "Sent successfully!",
         "caixa_entrada": "Inbox",
         "restrito_caixa": "🔒 Restricted to members of this team.",
+        "visitante_solicitacoes": "👁️ You're seeing only the public requests for this team.",
         "de": "From",
     }
 }
@@ -121,7 +170,10 @@ def t(chave):
 # 2. BANCO DE DADOS (Persistência em JSON)
 # ==========================================
 def estrutura_padrao_nucleo():
-    return {"atualizacoes": [], "tarefas": [], "drive": "https://drive.google.com", "planilha": "https://docs.google.com"}
+    return {
+        "atualizacoes": [], "tarefas": [], "lembretes": [],
+        "drive": "https://drive.google.com", "planilha": "https://docs.google.com"
+    }
 
 
 def carregar_banco():
@@ -149,6 +201,9 @@ def carregar_banco():
         dados["caixa_entrada"].setdefault(n, [])
 
         nd = dados["nucleos_dados"][n]
+        nd.setdefault("lembretes", [])
+        for msg in dados["caixa_entrada"].get(n, []):
+            msg.setdefault("publica", False)
         # tarefas antigas eram apenas strings -> converte para o formato novo (Trello-like)
         novas_tarefas = []
         for tarefa in nd.get("tarefas", []):
@@ -219,17 +274,17 @@ def imagem_base64(caminho):
 
 @st.cache_data(show_spinner=False)
 def logo_simbolo_base64(caminho):
-    """Extrai apenas o símbolo (ícone) do logotipo, cortando a parte quadrada da esquerda
-    e descartando o nome 'Instituto Mãe Lalu' escrito ao lado. Assume o layout ícone + texto.
-    Se o logotipo não seguir esse padrão, ajuste este recorte ou envie um arquivo já isolado."""
+    """Se o arquivo já for só o símbolo (proporção quase quadrada), usa como está.
+    Se for um logotipo largo (ícone + nome escrito ao lado), corta e mantém só o
+    quadrado da esquerda, descartando o texto."""
     if not os.path.exists(caminho):
         return None
     im = Image.open(caminho).convert("RGBA")
     w, h = im.size
-    lado = min(w, h)
-    recorte = im.crop((0, 0, lado, h))
+    if w > h * 1.15:
+        im = im.crop((0, 0, h, h))
     buf = io.BytesIO()
-    recorte.save(buf, format="PNG")
+    im.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode()
 
 
@@ -268,10 +323,6 @@ if st.session_state.usuario_logado is not None:
 
     if "nucleo" in qp and qp.get("nucleo") in NUCLEOS_INFO:
         st.session_state.nucleo_selecionado = qp.get("nucleo")
-    if "idioma" in qp and qp.get("idioma") in ("pt", "en"):
-        st.session_state.idioma = qp.get("idioma")
-    if "busca" in qp:
-        st.session_state.busca = qp.get("busca")
 
 
 # ==========================================
@@ -342,9 +393,21 @@ if st.session_state.usuario_logado is None:
             if st.button("Entrar", use_container_width=True):
                 chave = usuario_email.strip().lower()
                 if chave in st.session_state.usuarios:
-                    if st.session_state.usuarios[chave]["senha"] == senha_login:
-                        st.session_state.usuario_logado = st.session_state.usuarios[chave]
-                        st.session_state.nucleo_selecionado = st.session_state.usuarios[chave]["nucleo"]
+                    u = st.session_state.usuarios[chave]
+                    senha_ok = False
+                    if "senha_hash" in u:
+                        senha_ok = verificar_senha(senha_login, u["salt"], u["senha_hash"])
+                    elif "senha" in u:
+                        # conta antiga em texto puro: valida e migra para hash na hora
+                        senha_ok = (u["senha"] == senha_login)
+                        if senha_ok:
+                            salt, h = hash_senha(senha_login)
+                            u["salt"], u["senha_hash"] = salt, h
+                            u.pop("senha", None)
+                            salvar_banco()
+                    if senha_ok:
+                        st.session_state.usuario_logado = u
+                        st.session_state.nucleo_selecionado = u["nucleo"]
                         st.rerun()
                     else:
                         st.error("Senha incorreta.")
@@ -354,6 +417,17 @@ if st.session_state.usuario_logado is None:
             st.markdown("<p style='text-align:center; font-size:12px; margin-top:10px;'>Ainda não tem acesso?</p>", unsafe_allow_html=True)
             if st.button("Criar nova conta", use_container_width=True):
                 st.session_state.modo_tela = "cadastro"
+                st.rerun()
+
+            st.markdown("<div style='border-top:1px solid rgba(255,255,255,0.25); margin:14px 0;'></div>", unsafe_allow_html=True)
+            if st.button("👁️ Entrar como visitante", use_container_width=True):
+                st.session_state.usuario_logado = {
+                    "nome": "Visitante",
+                    "email": None,
+                    "nucleo": None,
+                    "visitante": True
+                }
+                st.session_state.nucleo_selecionado = list(NUCLEOS_INFO.keys())[0]
                 st.rerun()
 
         else:
@@ -373,11 +447,13 @@ if st.session_state.usuario_logado is None:
                 elif chave in st.session_state.usuarios:
                     st.warning("Este email já está cadastrado.")
                 else:
+                    salt, h = hash_senha(nova_senha)
                     st.session_state.usuarios[chave] = {
                         "nome": novo_nome.strip(),
                         "email": chave,
                         "nucleo": novo_nucleo,
-                        "senha": nova_senha
+                        "salt": salt,
+                        "senha_hash": h
                     }
                     salvar_banco()
                     st.success("Cadastro realizado!")
@@ -395,11 +471,27 @@ if st.session_state.usuario_logado is None:
 else:
     usuario = st.session_state.usuario_logado
     n_sel = st.session_state.nucleo_selecionado
-    idioma_atual = st.session_state.idioma
-    idioma_alvo = "en" if idioma_atual == "pt" else "pt"
     logo_simbolo_b64 = logo_simbolo_base64(LOGO_PATH)
     banner_b64 = banner_base64(BANNER_PATH)
     iniciais = "".join([p[0].upper() for p in usuario["nome"].split()[:2]]) or "?"
+
+    # Camada extra de dificuldade contra inspeção casual (não é segurança real:
+    # ver seção de segurança na resposta para detalhes e limites disso).
+    st.iframe("""
+    <script>
+    (function() {
+        try {
+            const doc = window.parent.document;
+            doc.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+            doc.addEventListener('keydown', function(e) {
+                if (e.key === 'F12') e.preventDefault();
+                if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) e.preventDefault();
+                if (e.ctrlKey && e.key === 'u') e.preventDefault();
+            });
+        } catch (err) {}
+    })();
+    </script>
+    """, height=1, width=1)
 
     st.markdown(f"""
         <style>
@@ -433,7 +525,6 @@ else:
             row-gap: 8px;
         }}
         .ilha-logo {{ height: 30px; border-radius: 8px; flex-shrink:0; }}
-        .ilha-nome {{ font-weight: 700; font-size: 15px; color:#1d1d1f; white-space:nowrap; }}
         .ilha-pills {{ display:flex; gap:5px; flex-wrap: wrap; }}
         .ilha-pill,
         .ilha-pill:link,
@@ -451,15 +542,6 @@ else:
         }}
         .ilha-pill:hover {{ background: rgba(0,0,0,0.1); }}
         .ilha-pill.ativa {{ background:#1d1d1f; color:#ffffff !important; }}
-        .ilha-busca input {{
-            border:none; background: rgba(0,0,0,0.05); border-radius:980px; padding:7px 14px;
-            font-size:12.5px; width:130px; color:#1d1d1f;
-        }}
-        .ilha-icone {{
-            text-decoration:none; color:#1d1d1f !important; font-size:15px; background: rgba(0,0,0,0.05);
-            border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
-            flex-shrink:0;
-        }}
         .ilha-perfil {{ margin-left: auto; flex-shrink:0; position: relative; }}
         .ilha-perfil summary {{
             list-style:none; cursor:pointer; width:34px; height:34px; border-radius:50%;
@@ -527,36 +609,69 @@ else:
         .task-footer {{ font-size:10.5px; color:#86868b; margin-top:10px; }}
         .kanban-col-title {{ font-size:13px; font-weight:700; color:#6e6e73; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;}}
 
+        /* ---------- LEMBRETES ---------- */
+        .lembrete-card {{
+            background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:12px;
+            box-shadow:0 2px 10px rgba(0,0,0,0.05); border-left: 5px solid #0071e3;
+        }}
+        .lembrete-titulo {{ font-weight:600; font-size:14px; margin-bottom:6px; }}
+        .lembrete-desc {{ font-size:12.5px; color:#6e6e73; line-height:1.4; margin-bottom:8px; }}
+        .lembrete-data {{
+            display:inline-block; font-size:11px; font-weight:700; color:#0071e3;
+            background:rgba(0,113,227,0.1); padding:4px 10px; border-radius:980px;
+        }}
+        .lembrete-data.atrasado {{ color:#ff3b30; background:rgba(255,59,48,0.1); }}
+
+        /* ---------- RESPONSIVO (CELULAR) ---------- */
+        @media (max-width: 700px) {{
+            .ilha-flutuante {{ padding: 6px 10px; gap: 6px; border-radius: 20px; top: 8px; }}
+            .ilha-logo {{ height: 24px; }}
+            .ilha-pill {{ padding: 6px 9px; }}
+            .ilha-pill .rotulo {{ display:none; }}
+            .ilha-perfil summary {{ width: 28px; height: 28px; font-size: 10px; }}
+            .banner-imla {{ margin-top: 60px; height: 190px; padding: 18px 20px; border-radius:18px; }}
+            .banner-imla h1 {{ font-size: 26px; }}
+            .banner-imla p {{ font-size: 12px; }}
+        }}
+
         </style>
     """, unsafe_allow_html=True)
 
     # ---------- MONTA A ILHA FLUTUANTE (HTML puro, navegação via query params) ----------
+    eh_visitante = bool(usuario.get("visitante"))
+
     pills_html = ""
     for nome, emoji in NUCLEOS_INFO.items():
         ativa = "ativa" if nome == n_sel else ""
-        pills_html += f'<a class="ilha-pill {ativa}" href="?nucleo={nome}&idioma={idioma_atual}">{emoji} {nome}</a>'
+        pills_html += f'<a class="ilha-pill {ativa}" href="?nucleo={nome}">{emoji}<span class="rotulo"> {nome}</span></a>'
 
     logo_tag = f'<img class="ilha-logo" src="data:image/png;base64,{logo_simbolo_b64}">' if logo_simbolo_b64 else ""
 
-    navbar_html = f"""
-    <div class="ilha-flutuante">
-        {logo_tag}
-        <span class="ilha-nome">{t('titulo_sistema')}</span>
-        <div class="ilha-pills">{pills_html}</div>
-        <form class="ilha-busca" method="get" style="margin:0;">
-            <input type="hidden" name="nucleo" value="{n_sel}">
-            <input type="hidden" name="idioma" value="{idioma_atual}">
-            <input type="text" name="busca" placeholder="🔍 {t('buscar_placeholder')}" value="{st.session_state.busca}">
-        </form>
-        <a class="ilha-icone" title="PT / EN" href="?nucleo={n_sel}&idioma={idioma_alvo}">🌐</a>
-        <details class="ilha-perfil">
-            <summary>{iniciais}</summary>
+    if eh_visitante:
+        painel_perfil_html = f"""
+            <div class="painel-perfil">
+                <div class="nome">👁️ Modo Visitante</div>
+                <div class="info">Você está vendo o sistema apenas para leitura.</div>
+                <a class="sair" href="?acao=sair">Sair do modo visitante</a>
+            </div>
+        """
+    else:
+        painel_perfil_html = f"""
             <div class="painel-perfil">
                 <div class="nome">{usuario['nome']}</div>
                 <div class="info">{t('email_label')}: {usuario['email']}</div>
                 <div class="info">{t('nucleo_label')}: {NUCLEOS_INFO.get(usuario['nucleo'],'')} {usuario['nucleo']}</div>
                 <a class="sair" href="?acao=sair">{t('sair')}</a>
             </div>
+        """
+
+    navbar_html = f"""
+    <div class="ilha-flutuante">
+        {logo_tag}
+        <div class="ilha-pills">{pills_html}</div>
+        <details class="ilha-perfil">
+            <summary>{"👁️" if eh_visitante else iniciais}</summary>
+            {painel_perfil_html}
         </details>
     </div>
     """
@@ -572,33 +687,28 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    if st.session_state.busca:
-        col_b1, col_b2 = st.columns([6, 1])
-        with col_b1:
-            st.info(f"🔍 {t('buscar_placeholder')} \"{st.session_state.busca}\"")
-        with col_b2:
-            st.markdown(f'<a href="?nucleo={n_sel}&idioma={idioma_atual}">✕ Limpar</a>', unsafe_allow_html=True)
-
-    # ---------- MAPA MENTAL DOS NÚCLEOS ---------- (removido: navegação já ocorre pela barra flutuante)
-
     st.divider()
 
     st.markdown(f"<h2 style='font-size: 30px;'>{NUCLEOS_INFO.get(n_sel,'')} {n_sel}</h2>", unsafe_allow_html=True)
 
-    aba_feed, aba_tarefas, aba_solicitacoes = st.tabs([t("aba_novidades"), t("aba_tarefas"), t("aba_solicitacoes")])
+    aba_feed, aba_tarefas, aba_lembretes, aba_solicitacoes = st.tabs(
+        [t("aba_novidades"), t("aba_tarefas"), t("aba_lembretes"), t("aba_solicitacoes")]
+    )
+
+    pode_editar = (not eh_visitante) and (usuario["nucleo"] == n_sel)
 
     # ================= ABA NOVIDADES =================
     with aba_feed:
-        if usuario['nucleo'] == n_sel:
+        if pode_editar:
             with st.form("form_novo"):
                 texto = st.text_area(t("compartilhar") + ":")
                 if st.form_submit_button(t("publicar")) and texto.strip():
-                    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                    agora = agora_br().strftime("%d/%m/%Y %H:%M")
                     st.session_state.nucleos_dados[n_sel]["atualizacoes"].insert(0, {
                         "texto": texto,
                         "data": agora,
                         "autor_nome": usuario["nome"],
-                        "autor_email": usuario["email"]
+                        "autor_email": usuario.get("email")
                     })
                     salvar_banco()
                     st.rerun()
@@ -606,10 +716,6 @@ else:
         st.write("")
         col_c1, col_c2, col_c3 = st.columns(3)
         posts = st.session_state.nucleos_dados[n_sel]["atualizacoes"]
-
-        busca_lower = st.session_state.busca.lower().strip()
-        if busca_lower:
-            posts = [p for p in posts if busca_lower in p.get("texto", "").lower()]
 
         if not posts:
             st.caption("Nenhuma atualização ainda.")
@@ -633,8 +739,6 @@ else:
         c_link2.link_button(t("cronogramas"), st.session_state.nucleos_dados[n_sel]["planilha"])
         st.divider()
 
-        pode_editar = usuario['nucleo'] == n_sel
-
         if pode_editar:
             with st.expander(f"➕ {t('nova_demanda')}"):
                 with st.form("form_nova_tarefa", clear_on_submit=True):
@@ -642,7 +746,7 @@ else:
                     nova_descricao = st.text_area(t("descricao_demanda"))
                     nova_prioridade = st.selectbox(t("prioridade"), PRIORIDADE_OPCOES, index=1)
                     if st.form_submit_button(t("adicionar_demanda")) and novo_titulo.strip():
-                        agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                        agora = agora_br().strftime("%d/%m/%Y %H:%M")
                         st.session_state.nucleos_dados[n_sel]["tarefas"].append({
                             "id": str(uuid.uuid4())[:8],
                             "titulo": novo_titulo.strip(),
@@ -658,8 +762,6 @@ else:
             st.caption(t("restrito_edicao"))
 
         tarefas = st.session_state.nucleos_dados[n_sel]["tarefas"]
-        if busca_lower:
-            tarefas = [tf for tf in tarefas if busca_lower in tf.get("titulo", "").lower()]
 
         col_k1, col_k2, col_k3 = st.columns(3)
         colunas_kanban = {STATUS_OPCOES[0]: col_k1, STATUS_OPCOES[1]: col_k2, STATUS_OPCOES[2]: col_k3}
@@ -689,30 +791,118 @@ else:
                                 descricao_edit = st.text_area(t("descricao_demanda"), value=tf.get("descricao", ""), key=f"desc_{tf['id']}")
                                 status_edit = st.selectbox(t("status"), STATUS_OPCOES, index=STATUS_OPCOES.index(tf.get("status", "Criada")), key=f"sta_{tf['id']}")
                                 prio_edit = st.selectbox(t("prioridade"), PRIORIDADE_OPCOES, index=PRIORIDADE_OPCOES.index(tf.get("prioridade", "Média")), key=f"pri_{tf['id']}")
-                                if st.form_submit_button(t("salvar")):
+                                col_salvar, col_excluir = st.columns(2)
+                                salvar_clicado = col_salvar.form_submit_button(t("salvar"))
+                                excluir_clicado = col_excluir.form_submit_button(t("excluir_tarefa"))
+                                if salvar_clicado:
                                     tf["titulo"] = titulo_edit.strip() or tf["titulo"]
                                     tf["descricao"] = descricao_edit.strip()
                                     tf["status"] = status_edit
                                     tf["prioridade"] = prio_edit
                                     salvar_banco()
                                     st.rerun()
+                                if excluir_clicado:
+                                    st.session_state.nucleos_dados[n_sel]["tarefas"] = [
+                                        x for x in st.session_state.nucleos_dados[n_sel]["tarefas"] if x["id"] != tf["id"]
+                                    ]
+                                    salvar_banco()
+                                    st.rerun()
+
+    # ================= ABA LEMBRETES (DEMANDAS RECORRENTES) =================
+    with aba_lembretes:
+        if pode_editar:
+            with st.expander(f"➕ {t('novo_lembrete')}"):
+                with st.form("form_novo_lembrete", clear_on_submit=True):
+                    lem_titulo = st.text_input(t("titulo_lembrete"))
+                    lem_descricao = st.text_area(t("descricao_lembrete"))
+                    lem_data = st.date_input(t("proxima_data"), value=datetime.date.today())
+                    if st.form_submit_button(t("adicionar_lembrete")) and lem_titulo.strip():
+                        st.session_state.nucleos_dados[n_sel].setdefault("lembretes", []).append({
+                            "id": str(uuid.uuid4())[:8],
+                            "titulo": lem_titulo.strip(),
+                            "descricao": lem_descricao.strip(),
+                            "proxima_data": lem_data.isoformat(),
+                            "autor_nome": usuario["nome"],
+                            "data_criacao": agora_br().strftime("%d/%m/%Y %H:%M")
+                        })
+                        salvar_banco()
+                        st.rerun()
+        else:
+            st.caption(t("restrito_edicao"))
+
+        lembretes = st.session_state.nucleos_dados[n_sel].setdefault("lembretes", [])
+        lembretes_ordenados = sorted(lembretes, key=lambda l: l.get("proxima_data", ""))
+
+        if not lembretes_ordenados:
+            st.caption(t("sem_lembretes"))
+
+        hoje = agora_br().date()
+        for lm in lembretes_ordenados:
+            try:
+                data_lm = datetime.date.fromisoformat(lm.get("proxima_data", ""))
+                data_fmt = data_lm.strftime("%d/%m/%Y")
+                atrasado = data_lm < hoje
+            except ValueError:
+                data_fmt = lm.get("proxima_data", "—")
+                atrasado = False
+
+            descricao_html = f"<div class='lembrete-desc'>{lm['descricao']}</div>" if lm.get("descricao") else ""
+            classe_data = "lembrete-data atrasado" if atrasado else "lembrete-data"
+            rotulo_data = f"⚠️ {data_fmt}" if atrasado else f"📅 {data_fmt}"
+
+            st.markdown(f"""
+            <div class="lembrete-card">
+                <div class="lembrete-titulo">{lm['titulo']}</div>
+                {descricao_html}
+                <span class="{classe_data}">{rotulo_data}</span>
+                <div class="task-footer">{t('criado_por')} {lm.get('autor_nome','—')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if pode_editar:
+                with st.expander(t("editar"), expanded=False):
+                    with st.form(f"editar_lembrete_{lm['id']}"):
+                        tit_edit = st.text_input(t("titulo_lembrete"), value=lm["titulo"], key=f"lt_{lm['id']}")
+                        desc_edit = st.text_area(t("descricao_lembrete"), value=lm.get("descricao", ""), key=f"ld_{lm['id']}")
+                        try:
+                            data_atual = datetime.date.fromisoformat(lm.get("proxima_data", ""))
+                        except ValueError:
+                            data_atual = datetime.date.today()
+                        data_edit = st.date_input(t("proxima_data"), value=data_atual, key=f"ldt_{lm['id']}")
+                        col_s, col_e = st.columns(2)
+                        salvar_lm = col_s.form_submit_button(t("salvar"))
+                        excluir_lm = col_e.form_submit_button(t("excluir_lembrete"))
+                        if salvar_lm:
+                            lm["titulo"] = tit_edit.strip() or lm["titulo"]
+                            lm["descricao"] = desc_edit.strip()
+                            lm["proxima_data"] = data_edit.isoformat()
+                            salvar_banco()
+                            st.rerun()
+                        if excluir_lm:
+                            st.session_state.nucleos_dados[n_sel]["lembretes"] = [
+                                x for x in st.session_state.nucleos_dados[n_sel]["lembretes"] if x["id"] != lm["id"]
+                            ]
+                            salvar_banco()
+                            st.rerun()
 
     # ================= ABA SOLICITAÇÕES =================
     with aba_solicitacoes:
-        if usuario['nucleo'] == n_sel:
+        if pode_editar:
             st.markdown(f"#### {t('enviar_solicitacao')}")
             with st.form("form_sol", clear_on_submit=True):
                 dest = st.selectbox(t("para_nucleo"), list(NUCLEOS_INFO.keys()))
                 assunto = st.text_input(t("assunto") + ":")
                 msg = st.text_area(t("mensagem") + ":")
+                visibilidade = st.radio(t("visibilidade"), [t("privada"), t("publica")], horizontal=True)
                 if st.form_submit_button(t("enviar")) and assunto.strip():
-                    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                    agora = agora_br().strftime("%d/%m/%Y %H:%M")
                     st.session_state.caixa_entrada[dest].append({
                         "assunto": assunto,
                         "mensagem": msg,
                         "data": agora,
                         "de_nome": usuario["nome"],
-                        "de_nucleo": usuario["nucleo"]
+                        "de_nucleo": usuario["nucleo"],
+                        "publica": visibilidade == t("publica")
                     })
                     salvar_banco()
                     st.success(t("enviado"))
@@ -722,8 +912,16 @@ else:
             if not caixa:
                 st.caption("Nenhuma solicitação recebida ainda.")
             for m in reversed(caixa):
-                with st.expander(f"📩 {m['assunto']} ({t('de')}: {m.get('de_nome','—')} · {m.get('de_nucleo','')})"):
+                selo = "🌐 " if m.get("publica") else "🔒 "
+                with st.expander(f"{selo}📩 {m['assunto']} ({t('de')}: {m.get('de_nome','—')} · {m.get('de_nucleo','')})"):
                     st.write(m['mensagem'])
                     st.caption(m['data'])
         else:
-            st.error(t("restrito_caixa"))
+            st.caption(t("visitante_solicitacoes"))
+            caixa_publica = [m for m in st.session_state.caixa_entrada[n_sel] if m.get("publica")]
+            if not caixa_publica:
+                st.caption("Nenhuma solicitação pública neste núcleo.")
+            for m in reversed(caixa_publica):
+                with st.expander(f"🌐 📩 {m['assunto']} ({t('de')}: {m.get('de_nome','—')} · {m.get('de_nucleo','')})"):
+                    st.write(m['mensagem'])
+                    st.caption(m['data'])
