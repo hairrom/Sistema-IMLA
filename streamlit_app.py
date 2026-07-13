@@ -37,7 +37,7 @@ def verificar_senha(senha, salt, hash_esperado):
 st.set_page_config(
     page_title="Sistema IMLA",
     page_icon="🕊️",
-    layout="wite",
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
@@ -71,9 +71,9 @@ TEXTOS = {
         "nucleo_label": "Núcleo",
         "email_label": "E-mail",
         "buscar_placeholder": "Buscar...",
-        "aba_novidades": "Novidades",
+        "aba_novidades": "As novidades",
         "aba_tarefas": "Demandas",
-        "aba_lembretes": "Avisos",
+        "aba_lembretes": "Lembretes",
         "aba_solicitacoes": "Solicitações",
         "compartilhar": "Compartilhar algo novo",
         "publicar": "Publicar",
@@ -93,7 +93,7 @@ TEXTOS = {
         "status": "Status",
         "restrito_edicao": "🔒 Apenas membros deste núcleo podem editar.",
         "novo_lembrete": "Novo lembrete",
-        "titulo_lembrete": "Nome da tarefa",
+        "titulo_lembrete": "Nome da tarefa recorrente",
         "descricao_lembrete": "O que precisa ser feito",
         "proxima_data": "Próxima data",
         "adicionar_lembrete": "💾 Salvar",
@@ -939,3 +939,4 @@ else:
                 with st.expander(f"🌐 📩 {m['assunto']} ({t('de')}: {m.get('de_nome','—')} · {m.get('de_nucleo','')})"):
                     st.write(m['mensagem'])
                     st.caption(m['data'])
+            
