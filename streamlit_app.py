@@ -37,7 +37,7 @@ def verificar_senha(senha, salt, hash_esperado):
 st.set_page_config(
     page_title="Sistema IMLA",
     page_icon="🕊️",
-    layout="wide",
+    layout="gren",
     initial_sidebar_state="collapsed"
 )
 
