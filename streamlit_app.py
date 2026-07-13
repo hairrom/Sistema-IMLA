@@ -5,7 +5,6 @@ import json
 import base64
 import io
 import uuid
-import math
 from PIL import Image
 
 # ==========================================
@@ -40,7 +39,7 @@ STATUS_COR = {"Criada": "#8e8e93", "Em andamento": "#0071e3", "Concluída": "#34
 TEXTOS = {
     "pt": {
         "titulo_sistema": "Sistema IMLA",
-        "subtitulo": "Organograma Interativo",
+        "subtitulo": "Onde nós trabalhamos",
         "sair": "Sair",
         "perfil": "Perfil",
         "logado_como": "Conectado como",
@@ -56,6 +55,7 @@ TEXTOS = {
         "cronogramas": "📊 Cronogramas",
         "nova_demanda": "Nova demanda",
         "titulo_demanda": "Título da demanda",
+        "descricao_demanda": "Descrição (o que precisa ser feito)",
         "prioridade": "Prioridade",
         "adicionar_demanda": "+ Adicionar demanda",
         "criado_por": "Criado por",
@@ -75,7 +75,7 @@ TEXTOS = {
     },
     "en": {
         "titulo_sistema": "IMLA System",
-        "subtitulo": "Interactive Org Chart",
+        "subtitulo": "Where we work",
         "sair": "Log out",
         "perfil": "Profile",
         "logado_como": "Signed in as",
@@ -91,6 +91,7 @@ TEXTOS = {
         "cronogramas": "📊 Timelines",
         "nova_demanda": "New task",
         "titulo_demanda": "Task title",
+        "descricao_demanda": "Description (what needs to be done)",
         "prioridade": "Priority",
         "adicionar_demanda": "+ Add task",
         "criado_por": "Created by",
@@ -157,6 +158,7 @@ def carregar_banco():
                     "titulo": tarefa,
                     "status": "Criada",
                     "prioridade": "Média",
+                    "descricao": "",
                     "autor_nome": "—",
                     "data_hora": ""
                 })
@@ -164,6 +166,7 @@ def carregar_banco():
                 tarefa.setdefault("id", str(uuid.uuid4())[:8])
                 tarefa.setdefault("status", "Criada")
                 tarefa.setdefault("prioridade", "Média")
+                tarefa.setdefault("descricao", "")
                 tarefa.setdefault("autor_nome", tarefa.get("autor", "—"))
                 tarefa.setdefault("data_hora", tarefa.get("data", ""))
                 novas_tarefas.append(tarefa)
@@ -212,6 +215,22 @@ def imagem_base64(caminho):
         return None
     with open(caminho, "rb") as f:
         return base64.b64encode(f.read()).decode()
+
+
+@st.cache_data(show_spinner=False)
+def logo_simbolo_base64(caminho):
+    """Extrai apenas o símbolo (ícone) do logotipo, cortando a parte quadrada da esquerda
+    e descartando o nome 'Instituto Mãe Lalu' escrito ao lado. Assume o layout ícone + texto.
+    Se o logotipo não seguir esse padrão, ajuste este recorte ou envie um arquivo já isolado."""
+    if not os.path.exists(caminho):
+        return None
+    im = Image.open(caminho).convert("RGBA")
+    w, h = im.size
+    lado = min(w, h)
+    recorte = im.crop((0, 0, lado, h))
+    buf = io.BytesIO()
+    recorte.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
 
 
 @st.cache_data(show_spinner=False)
@@ -378,7 +397,7 @@ else:
     n_sel = st.session_state.nucleo_selecionado
     idioma_atual = st.session_state.idioma
     idioma_alvo = "en" if idioma_atual == "pt" else "pt"
-    logo_b64 = imagem_base64(LOGO_PATH)
+    logo_simbolo_b64 = logo_simbolo_base64(LOGO_PATH)
     banner_b64 = banner_base64(BANNER_PATH)
     iniciais = "".join([p[0].upper() for p in usuario["nome"].split()[:2]]) or "?"
 
@@ -402,22 +421,32 @@ else:
             transform: translateX(-50%);
             width: min(96%, 1200px);
             z-index: 9999;
-            background: rgba(255,255,255,0.72);
+            background: rgba(255,255,255,0.78);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border-radius: 980px;
+            border-radius: 26px;
             border: 1px solid rgba(255,255,255,0.4);
             box-shadow: 0 8px 30px rgba(0,0,0,0.18);
-            padding: 8px 20px;
-            display: flex; align-items: center; gap: 18px;
-            flex-wrap: nowrap; overflow-x: auto;
+            padding: 8px 16px;
+            display: flex; align-items: center; gap: 10px;
+            flex-wrap: wrap;
+            row-gap: 8px;
         }}
         .ilha-logo {{ height: 30px; border-radius: 8px; flex-shrink:0; }}
         .ilha-nome {{ font-weight: 700; font-size: 15px; color:#1d1d1f; white-space:nowrap; }}
-        .ilha-pills {{ display:flex; gap:6px; flex-wrap: nowrap; }}
+        .ilha-pills {{ display:flex; gap:5px; flex-wrap: wrap; }}
+        .ilha-pill,
+        .ilha-pill:link,
+        .ilha-pill:visited,
+        .ilha-pill:hover,
+        .ilha-pill:active {{
+            text-decoration:none !important;
+            border-bottom:none !important;
+            box-shadow:none;
+        }}
         .ilha-pill {{
-            text-decoration:none; font-size:12.5px; font-weight:600; color:#1d1d1f !important;
-            background: rgba(0,0,0,0.05); padding:7px 12px; border-radius:980px; white-space:nowrap;
+            font-size:12px; font-weight:600; color:#1d1d1f !important;
+            background: rgba(0,0,0,0.05); padding:6px 11px; border-radius:980px; white-space:nowrap;
             transition: 0.15s;
         }}
         .ilha-pill:hover {{ background: rgba(0,0,0,0.1); }}
@@ -431,9 +460,9 @@ else:
             border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
             flex-shrink:0;
         }}
-        .ilha-perfil {{ margin-left: auto; flex-shrink:0; }}
+        .ilha-perfil {{ margin-left: auto; flex-shrink:0; position: relative; }}
         .ilha-perfil summary {{
-            list-style:none; cursor:pointer; width:32px; height:32px; border-radius:50%;
+            list-style:none; cursor:pointer; width:34px; height:34px; border-radius:50%;
             background:#0071e3; color:white !important; display:flex; align-items:center; justify-content:center;
             font-size:12px; font-weight:700;
         }}
@@ -441,7 +470,8 @@ else:
         .ilha-perfil[open] summary {{ background:#004c99; }}
         .painel-perfil {{
             position:absolute; right:0; top:44px; background:white; border-radius:16px;
-            box-shadow:0 10px 30px rgba(0,0,0,0.2); padding:16px 18px; width:230px; text-align:left;
+            box-shadow:0 12px 34px rgba(0,0,0,0.25); padding:16px 18px; width:230px; text-align:left;
+            z-index: 10000;
         }}
         .painel-perfil .nome {{ font-weight:700; font-size:14px; color:#1d1d1f; }}
         .painel-perfil .info {{ font-size:12px; color:#6e6e73; margin-top:2px; }}
@@ -452,14 +482,20 @@ else:
 
         /* ---------- BANNER ---------- */
         .banner-imla {{
-            margin-top: 70px;
-            width: 100%; height: 260px; border-radius: 24px; overflow:hidden;
-            background-image: linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.55)), url(data:image/jpeg;base64,{banner_b64 if banner_b64 else ''});
+            margin-top: 76px;
+            width: 100%; height: 240px; border-radius: 24px; overflow:hidden;
+            background-image: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.7)), url(data:image/jpeg;base64,{banner_b64 if banner_b64 else ''});
             background-size: cover; background-position: center;
             display:flex; align-items:flex-end; padding: 26px 34px;
         }}
-        .banner-imla h1 {{ color:white !important; font-size: 40px; margin:0; }}
-        .banner-imla p {{ color: rgba(255,255,255,0.85) !important; margin:0; font-size:15px; }}
+        .banner-imla h1 {{
+            color:#ffffff !important; font-size: 40px; margin:0; font-weight:700;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.55);
+        }}
+        .banner-imla p {{
+            color: #ffffff !important; margin:0; font-size:15px; opacity:0.92;
+            text-shadow: 0 1px 8px rgba(0,0,0,0.5);
+        }}
 
         div.stButton > button:first-child {{
             background-color: transparent; border: none; box-shadow: none; padding: 10px;
@@ -482,7 +518,8 @@ else:
             background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:12px;
             box-shadow:0 2px 10px rgba(0,0,0,0.05); border-left: 5px solid #ccc;
         }}
-        .task-titulo {{ font-weight:600; font-size:14px; margin-bottom:8px; }}
+        .task-titulo {{ font-weight:600; font-size:14px; margin-bottom:6px; }}
+        .task-desc {{ font-size:12.5px; color:#6e6e73; line-height:1.4; margin-bottom:8px; }}
         .chip {{
             display:inline-block; font-size:10.5px; font-weight:700; color:white; padding:3px 9px;
             border-radius:980px; margin-right:6px;
@@ -490,23 +527,6 @@ else:
         .task-footer {{ font-size:10.5px; color:#86868b; margin-top:10px; }}
         .kanban-col-title {{ font-size:13px; font-weight:700; color:#6e6e73; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;}}
 
-        /* ---------- MAPA MENTAL / ORGANOGRAMA ---------- */
-        .mapa-container {{ position:relative; width:100%; height:420px; margin: 10px 0 30px 0; }}
-        .mapa-centro {{
-            position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-            width:96px; height:96px; border-radius:50%; background:white; box-shadow:0 6px 24px rgba(0,0,0,0.12);
-            display:flex; align-items:center; justify-content:center; overflow:hidden; z-index:3; border: 3px solid #f2f2f2;
-        }}
-        .mapa-centro img {{ width:72%; }}
-        .mapa-no {{
-            position:absolute; transform:translate(-50%,-50%); z-index:2; display:flex; flex-direction:column;
-            align-items:center; text-align:center; gap:6px;
-        }}
-        .mapa-bola {{
-            width:64px; height:64px; border-radius:50%; background:white; box-shadow:0 4px 16px rgba(0,0,0,0.1);
-            display:flex; align-items:center; justify-content:center; font-size:26px; border: 3px solid #eef6f7;
-        }}
-        .mapa-nome {{ font-size:12px; font-weight:600; color:#1d1d1f; max-width:100px; }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -516,7 +536,7 @@ else:
         ativa = "ativa" if nome == n_sel else ""
         pills_html += f'<a class="ilha-pill {ativa}" href="?nucleo={nome}&idioma={idioma_atual}">{emoji} {nome}</a>'
 
-    logo_tag = f'<img class="ilha-logo" src="data:image/png;base64,{logo_b64}">' if logo_b64 else ""
+    logo_tag = f'<img class="ilha-logo" src="data:image/png;base64,{logo_simbolo_b64}">' if logo_simbolo_b64 else ""
 
     navbar_html = f"""
     <div class="ilha-flutuante">
@@ -559,40 +579,7 @@ else:
         with col_b2:
             st.markdown(f'<a href="?nucleo={n_sel}&idioma={idioma_atual}">✕ Limpar</a>', unsafe_allow_html=True)
 
-    # ---------- MAPA MENTAL DOS NÚCLEOS ----------
-    n_total = len(NUCLEOS_INFO)
-    raio_x, raio_y = 42, 38
-    nos_html = ""
-    for i, (nome, emoji) in enumerate(NUCLEOS_INFO.items()):
-        angulo = (2 * math.pi * i / n_total) - math.pi / 2
-        x = 50 + raio_x * math.cos(angulo)
-        y = 50 + raio_y * math.sin(angulo)
-        nos_html += f"""
-        <div class="mapa-no" style="left:{x}%; top:{y}%;">
-            <div class="mapa-bola">{emoji}</div>
-            <div class="mapa-nome">{nome}</div>
-        </div>
-        """
-        cx, cy = 50 + raio_x * math.cos(angulo), 50 + raio_y * math.sin(angulo)
-
-    linhas_svg = ""
-    for i in range(n_total):
-        angulo = (2 * math.pi * i / n_total) - math.pi / 2
-        x = 50 + raio_x * math.cos(angulo)
-        y = 50 + raio_y * math.sin(angulo)
-        linhas_svg += f'<line x1="50" y1="50" x2="{x}" y2="{y}" stroke="#d6d6d8" stroke-width="0.4" vector-effect="non-scaling-stroke"/>'
-
-    logo_centro_tag = f'<img src="data:image/png;base64,{logo_b64}">' if logo_b64 else "🕊️"
-
-    st.markdown(f"""
-    <div class="mapa-container">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute; width:100%; height:100%;">
-            {linhas_svg}
-        </svg>
-        <div class="mapa-centro">{logo_centro_tag}</div>
-        {nos_html}
-    </div>
-    """, unsafe_allow_html=True)
+    # ---------- MAPA MENTAL DOS NÚCLEOS ---------- (removido: navegação já ocorre pela barra flutuante)
 
     st.divider()
 
@@ -652,12 +639,14 @@ else:
             with st.expander(f"➕ {t('nova_demanda')}"):
                 with st.form("form_nova_tarefa", clear_on_submit=True):
                     novo_titulo = st.text_input(t("titulo_demanda"))
+                    nova_descricao = st.text_area(t("descricao_demanda"))
                     nova_prioridade = st.selectbox(t("prioridade"), PRIORIDADE_OPCOES, index=1)
                     if st.form_submit_button(t("adicionar_demanda")) and novo_titulo.strip():
                         agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
                         st.session_state.nucleos_dados[n_sel]["tarefas"].append({
                             "id": str(uuid.uuid4())[:8],
                             "titulo": novo_titulo.strip(),
+                            "descricao": nova_descricao.strip(),
                             "status": "Criada",
                             "prioridade": nova_prioridade,
                             "autor_nome": usuario["nome"],
@@ -683,9 +672,11 @@ else:
                     st.caption("—")
                 for tf in tarefas_col:
                     cor_prio = PRIORIDADE_COR.get(tf.get("prioridade", "Média"), "#8e8e93")
+                    descricao_html = f"<div class='task-desc'>{tf['descricao']}</div>" if tf.get("descricao") else ""
                     st.markdown(f"""
                     <div class="task-card" style="border-left-color:{cor_prio};">
                         <div class="task-titulo">{tf['titulo']}</div>
+                        {descricao_html}
                         <span class="chip" style="background:{cor_prio};">{tf.get('prioridade','Média')}</span>
                         <div class="task-footer">{t('criado_por')} {tf.get('autor_nome','—')} · {tf.get('data_hora','')}</div>
                     </div>
@@ -695,10 +686,12 @@ else:
                         with st.expander(t("editar"), expanded=False):
                             with st.form(f"editar_{tf['id']}"):
                                 titulo_edit = st.text_input(t("titulo_demanda"), value=tf["titulo"], key=f"tit_{tf['id']}")
+                                descricao_edit = st.text_area(t("descricao_demanda"), value=tf.get("descricao", ""), key=f"desc_{tf['id']}")
                                 status_edit = st.selectbox(t("status"), STATUS_OPCOES, index=STATUS_OPCOES.index(tf.get("status", "Criada")), key=f"sta_{tf['id']}")
                                 prio_edit = st.selectbox(t("prioridade"), PRIORIDADE_OPCOES, index=PRIORIDADE_OPCOES.index(tf.get("prioridade", "Média")), key=f"pri_{tf['id']}")
                                 if st.form_submit_button(t("salvar")):
                                     tf["titulo"] = titulo_edit.strip() or tf["titulo"]
+                                    tf["descricao"] = descricao_edit.strip()
                                     tf["status"] = status_edit
                                     tf["prioridade"] = prio_edit
                                     salvar_banco()
@@ -706,25 +699,25 @@ else:
 
     # ================= ABA SOLICITAÇÕES =================
     with aba_solicitacoes:
-        st.markdown(f"#### {t('enviar_solicitacao')}")
-        with st.form("form_sol", clear_on_submit=True):
-            dest = st.selectbox(t("para_nucleo"), list(NUCLEOS_INFO.keys()))
-            assunto = st.text_input(t("assunto") + ":")
-            msg = st.text_area(t("mensagem") + ":")
-            if st.form_submit_button(t("enviar")) and assunto.strip():
-                agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-                st.session_state.caixa_entrada[dest].append({
-                    "assunto": assunto,
-                    "mensagem": msg,
-                    "data": agora,
-                    "de_nome": usuario["nome"],
-                    "de_nucleo": usuario["nucleo"]
-                })
-                salvar_banco()
-                st.success(t("enviado"))
-
-        st.write(f"### {t('caixa_entrada')}")
         if usuario['nucleo'] == n_sel:
+            st.markdown(f"#### {t('enviar_solicitacao')}")
+            with st.form("form_sol", clear_on_submit=True):
+                dest = st.selectbox(t("para_nucleo"), list(NUCLEOS_INFO.keys()))
+                assunto = st.text_input(t("assunto") + ":")
+                msg = st.text_area(t("mensagem") + ":")
+                if st.form_submit_button(t("enviar")) and assunto.strip():
+                    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                    st.session_state.caixa_entrada[dest].append({
+                        "assunto": assunto,
+                        "mensagem": msg,
+                        "data": agora,
+                        "de_nome": usuario["nome"],
+                        "de_nucleo": usuario["nucleo"]
+                    })
+                    salvar_banco()
+                    st.success(t("enviado"))
+
+            st.write(f"### {t('caixa_entrada')}")
             caixa = st.session_state.caixa_entrada[n_sel]
             if not caixa:
                 st.caption("Nenhuma solicitação recebida ainda.")
