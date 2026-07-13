@@ -63,7 +63,7 @@ STATUS_COR = {"Criada": "#8e8e93", "Em andamento": "#0071e3", "Concluída": "#34
 TEXTOS = {
     "pt": {
         "titulo_sistema": "Sistema IMLA",
-        "subtitulo": "Onde nós trabalhamos!",
+        "subtitulo": "Onde nós trabalhamos",
         "sair": "Sair",
         "encolher": "Encolher",
         "perfil": "Perfil",
@@ -71,9 +71,9 @@ TEXTOS = {
         "nucleo_label": "Núcleo",
         "email_label": "E-mail",
         "buscar_placeholder": "Buscar...",
-        "aba_novidades": "Novidades",
+        "aba_novidades": "As novidades",
         "aba_tarefas": "Demandas",
-        "aba_lembretes": "Avisos",
+        "aba_lembretes": "Lembretes",
         "aba_solicitacoes": "Solicitações",
         "compartilhar": "Compartilhar algo novo",
         "publicar": "Publicar",
@@ -497,10 +497,6 @@ else:
         .block-container {{ padding-top: 0.5rem !important; }}
 
         /* ---------- NAVBAR (agora com botões reais do Streamlit, sem reload de página) ---------- */
-        div[data-testid="stVerticalBlock"]:has(> div.element-container > div.stMarkdown > div > div.navbar-anchor) {{
-            display: none;
-        }}
-
         .st-key-navbar_container {{
             position: sticky;
             top: 8px;
@@ -514,24 +510,40 @@ else:
             padding: 10px 16px;
             margin-bottom: 18px;
         }}
+        .st-key-navbar_container div[data-testid="column"] {{
+            overflow: visible;
+        }}
+        .st-key-navbar_container .stButton {{
+            width: 100%;
+        }}
         .st-key-navbar_container .stButton>button {{
             border-radius: 980px !important;
-            font-size: 12.5px !important;
+            font-size: 12px !important;
             font-weight: 600 !important;
-            padding: 0.4rem 0.9rem !important;
+            padding: 0.4rem 0.6rem !important;
             border: none !important;
-            white-space: nowrap;
+            white-space: normal !important;
+            overflow-wrap: break-word;
+            word-break: keep-all;
+            line-height: 1.25 !important;
+            min-height: 2.2rem;
         }}
         .st-key-navbar_container button[kind="secondary"] {{
-            background-color: rgba(0,0,0,0.05) !important;
+            background-color: #ffffff !important;
             color: #1d1d1f !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
         }}
         .st-key-navbar_container button[kind="secondary"]:hover {{
-            background-color: rgba(0,0,0,0.1) !important;
+            background-color: #f2f2f2 !important;
+            border-color: rgba(0,0,0,0.18) !important;
         }}
         .st-key-navbar_container button[kind="primary"] {{
-            background-color: #1d1d1f !important;
+            background-color: #8dc63f !important;
             color: #ffffff !important;
+            border: 1px solid #8dc63f !important;
+        }}
+        .st-key-navbar_container button[kind="primary"]:hover {{
+            background-color: #7ab332 !important;
         }}
         .st-key-perfil_btn_col .stButton>button {{
             border-radius: 50% !important;
@@ -638,8 +650,8 @@ else:
 
     # ---------- NAVBAR (contêiner real do Streamlit, sem <a href> nem reload) ----------
     with st.container(key="navbar_container"):
-        n_nucleos = len(NUCLEOS_INFO)
-        larguras = [0.7] + [1] * n_nucleos + [0.5]
+        pesos_nucleos = [0.55 + len(nome) * 0.045 for nome in NUCLEOS_INFO]
+        larguras = [0.55] + pesos_nucleos + [0.45]
         cols = st.columns(larguras, vertical_alignment="center")
 
         with cols[0]:
@@ -687,8 +699,8 @@ else:
     st.markdown(f"""
         <div class="banner-imla">
             <div>
-                <h1>{t('titulo_sistema')}</h1>
-                <p>{t('subtitulo')}</p>
+                <h1 style="color:#ffffff !important;">{t('titulo_sistema')}</h1>
+                <p style="color:#ffffff !important;">{t('subtitulo')}</p>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -939,4 +951,3 @@ else:
                 with st.expander(f"🌐 📩 {m['assunto']} ({t('de')}: {m.get('de_nome','—')} · {m.get('de_nucleo','')})"):
                     st.write(m['mensagem'])
                     st.caption(m['data'])
-            
