@@ -135,6 +135,13 @@ def carregar_banco():
         }
 
     # --- Migração / compatibilidade com bancos antigos ---
+
+    # 1º: garante que TODO usuário já tenha o campo "nome" antes de qualquer
+    # outra parte do código tentar ler usuario["nome"] (evita KeyError).
+    for email, u in dados.get("usuarios", {}).items():
+        u.setdefault("nome", (u.get("email") or email).split("@")[0].title())
+        u.setdefault("email", email)
+
     for n in NUCLEOS_INFO:
         dados.setdefault("nucleos_dados", {}).setdefault(n, estrutura_padrao_nucleo())
         dados["caixa_entrada"] = dados.get("caixa_entrada", {})
@@ -164,14 +171,10 @@ def carregar_banco():
 
         # posts antigos guardavam e-mail como autor -> mantém compatível
         for post in nd.get("atualizacoes", []):
-            if "autor_nome" not in post:
+            if not post.get("autor_nome"):
                 autor_antigo = post.get("autor", "—")
                 usuario_ref = dados.get("usuarios", {}).get(autor_antigo)
-                post["autor_nome"] = usuario_ref["nome"] if usuario_ref else autor_antigo
-
-    # usuários antigos sem nome cadastrado
-    for email, u in dados.get("usuarios", {}).items():
-        u.setdefault("nome", email.split("@")[0].title())
+                post["autor_nome"] = usuario_ref.get("nome", autor_antigo) if usuario_ref else autor_antigo
 
     return dados
 
