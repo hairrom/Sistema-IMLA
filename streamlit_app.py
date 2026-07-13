@@ -1,142 +1,733 @@
 import streamlit as st
-import json
+import datetime
 import os
+import json
+import base64
+import io
+import uuid
+import math
+from PIL import Image
 
-# Configuração Global
-st.set_page_config(page_title="Sistema IMLA", layout="wide")
+# ==========================================
+# 1. CONFIGURAÇÃO DA PÁGINA
+# ==========================================
+st.set_page_config(
+    page_title="Sistema IMLA",
+    page_icon="🕊️",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# ARQUIVO DE BANCO
-DB_FILE = "imla_db.json"
+ARQUIVO_BANCO = "banco_iml.json"
+LOGO_PATH = "Logotipo Principal 01 (1).png"
+LOGIN_BG_PATH = "IMG_3987.JPG"
+BANNER_PATH = "IMG_3985.JPG"
 
-def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f: return json.load(f)
-    return {
-        "users": {},
-        "nucleos": {
-            n: {"feed": [], "tarefas": {"fazer": [], "progresso": [], "concluido": []}, "solicitacoes": []}
-            for n in ["Cozinha e Nutrição", "Comunicação", "Captação de Recursos", "Pedagógico", "Financeiro", "Apadrinhamento"]
-        }
+NUCLEOS_INFO = {
+    "Cozinha e Nutrição": "🍳",
+    "Comunicação": "📣",
+    "Pedagógico": "📚",
+    "Captação de Recursos": "🤝",
+    "Financeiro": "💰",
+    "Apadrinhamento": "💌",
+}
+
+STATUS_OPCOES = ["Criada", "Em andamento", "Concluída"]
+PRIORIDADE_OPCOES = ["Baixa", "Média", "Alta"]
+PRIORIDADE_COR = {"Baixa": "#34c759", "Média": "#ff9f0a", "Alta": "#ff3b30"}
+STATUS_COR = {"Criada": "#8e8e93", "Em andamento": "#0071e3", "Concluída": "#34c759"}
+
+TEXTOS = {
+    "pt": {
+        "titulo_sistema": "Sistema IMLA",
+        "subtitulo": "Organograma Interativo",
+        "sair": "Sair",
+        "perfil": "Perfil",
+        "logado_como": "Conectado como",
+        "nucleo_label": "Núcleo",
+        "email_label": "E-mail",
+        "buscar_placeholder": "Buscar...",
+        "aba_novidades": "As novidades",
+        "aba_tarefas": "Demandas",
+        "aba_solicitacoes": "Solicitações",
+        "compartilhar": "Compartilhar algo novo",
+        "publicar": "Publicar",
+        "acessar_drive": "📂 Acessar Drive",
+        "cronogramas": "📊 Cronogramas",
+        "nova_demanda": "Nova demanda",
+        "titulo_demanda": "Título da demanda",
+        "prioridade": "Prioridade",
+        "adicionar_demanda": "+ Adicionar demanda",
+        "criado_por": "Criado por",
+        "editar": "✏️ Editar",
+        "salvar": "Salvar alterações",
+        "status": "Status",
+        "restrito_edicao": "🔒 Apenas membros deste núcleo podem editar.",
+        "enviar_solicitacao": "Enviar solicitação",
+        "para_nucleo": "Para qual núcleo?",
+        "assunto": "Assunto",
+        "mensagem": "Mensagem",
+        "enviar": "Enviar",
+        "enviado": "Enviado com sucesso!",
+        "caixa_entrada": "Caixa de Entrada",
+        "restrito_caixa": "🔒 Restrito aos membros deste núcleo.",
+        "de": "De",
+    },
+    "en": {
+        "titulo_sistema": "IMLA System",
+        "subtitulo": "Interactive Org Chart",
+        "sair": "Log out",
+        "perfil": "Profile",
+        "logado_como": "Signed in as",
+        "nucleo_label": "Team",
+        "email_label": "E-mail",
+        "buscar_placeholder": "Search...",
+        "aba_novidades": "Updates",
+        "aba_tarefas": "Tasks",
+        "aba_solicitacoes": "Requests",
+        "compartilhar": "Share something new",
+        "publicar": "Post",
+        "acessar_drive": "📂 Open Drive",
+        "cronogramas": "📊 Timelines",
+        "nova_demanda": "New task",
+        "titulo_demanda": "Task title",
+        "prioridade": "Priority",
+        "adicionar_demanda": "+ Add task",
+        "criado_por": "Created by",
+        "editar": "✏️ Edit",
+        "salvar": "Save changes",
+        "status": "Status",
+        "restrito_edicao": "🔒 Only members of this team can edit.",
+        "enviar_solicitacao": "Send request",
+        "para_nucleo": "Which team?",
+        "assunto": "Subject",
+        "mensagem": "Message",
+        "enviar": "Send",
+        "enviado": "Sent successfully!",
+        "caixa_entrada": "Inbox",
+        "restrito_caixa": "🔒 Restricted to members of this team.",
+        "de": "From",
     }
+}
 
-def save_db():
-    with open(DB_FILE, "w") as f: json.dump(st.session_state.db, f)
 
-# Inicialização de Estado
-if "db" not in st.session_state: st.session_state.db = load_db()
-if "user" not in st.session_state: st.session_state.user = None
-if "view" not in st.session_state: st.session_state.view = "login"
-if "nucleo_atual" not in st.session_state: st.session_state.nucleo_atual = "Cozinha e Nutrição"
+def t(chave):
+    idioma = st.session_state.get("idioma", "pt")
+    return TEXTOS.get(idioma, TEXTOS["pt"]).get(chave, chave)
 
-# CSS ESTILO APPLE
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600&display=swap');
-    html, body, [class*="css"] { font-family: -apple-system, BlinkMacSystemFont, sans-serif !important; }
-    
-    .nav-bar { 
-        position: fixed; top: 0; left: 0; width: 100%; height: 70px; background: rgba(255,255,255,0.8);
-        backdrop-filter: blur(20px); z-index: 999; display: flex; align-items: center; 
-        padding: 0 40px; border-bottom: 1px solid rgba(0,0,0,0.1);
-    }
-    .card { background: #ffffff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 10px; }
-    .banner { width: 100%; height: 300px; object-fit: cover; border-radius: 24px; margin-top: 80px; }
-    </style>
-""", unsafe_allow_html=True)
 
-# --- FLUXO DE LOGIN/CADASTRO ---
-if st.session_state.user is None:
-    if st.session_state.view == "login":
-        st.title("Sistema IMLA")
-        email = st.text_input("E-mail")
-        senha = st.text_input("Senha", type="password")
-        if st.button("Entrar"):
-            user = st.session_state.db["users"].get(email)
-            if user and user["senha"] == senha:
-                st.session_state.user = user
-                st.rerun()
-            else: st.error("Credenciais inválidas")
-        if st.button("Criar Cadastro"): st.session_state.view = "cadastro"; st.rerun()
+# ==========================================
+# 2. BANCO DE DADOS (Persistência em JSON)
+# ==========================================
+def estrutura_padrao_nucleo():
+    return {"atualizacoes": [], "tarefas": [], "drive": "https://drive.google.com", "planilha": "https://docs.google.com"}
+
+
+def carregar_banco():
+    if os.path.exists(ARQUIVO_BANCO):
+        with open(ARQUIVO_BANCO, "r", encoding="utf-8") as f:
+            dados = json.load(f)
     else:
-        st.title("Cadastro IMLA")
-        nome = st.text_input("Nome Completo")
-        email = st.text_input("Seu melhor e-mail")
-        nucleo = st.selectbox("Núcleo", list(st.session_state.db["nucleos"].keys()))
-        senha = st.text_input("Senha", type="password")
-        conf = st.text_input("Confirmar Senha", type="password")
-        if st.button("Finalizar"):
-            if senha == conf:
-                st.session_state.db["users"][email] = {"nome": nome, "email": email, "nucleo": nucleo, "senha": senha}
-                save_db()
-                st.session_state.view = "login"; st.rerun()
-            else: st.error("Senhas não conferem")
-        if st.button("Voltar"): st.session_state.view = "login"; st.rerun()
+        dados = {
+            "usuarios": {},
+            "nucleos_dados": {n: estrutura_padrao_nucleo() for n in NUCLEOS_INFO},
+            "caixa_entrada": {n: [] for n in NUCLEOS_INFO}
+        }
 
-# --- ÁREA PRIVADA ---
+    # --- Migração / compatibilidade com bancos antigos ---
+    for n in NUCLEOS_INFO:
+        dados.setdefault("nucleos_dados", {}).setdefault(n, estrutura_padrao_nucleo())
+        dados["caixa_entrada"] = dados.get("caixa_entrada", {})
+        dados["caixa_entrada"].setdefault(n, [])
+
+        nd = dados["nucleos_dados"][n]
+        # tarefas antigas eram apenas strings -> converte para o formato novo (Trello-like)
+        novas_tarefas = []
+        for tarefa in nd.get("tarefas", []):
+            if isinstance(tarefa, str):
+                novas_tarefas.append({
+                    "id": str(uuid.uuid4())[:8],
+                    "titulo": tarefa,
+                    "status": "Criada",
+                    "prioridade": "Média",
+                    "autor_nome": "—",
+                    "data_hora": ""
+                })
+            else:
+                tarefa.setdefault("id", str(uuid.uuid4())[:8])
+                tarefa.setdefault("status", "Criada")
+                tarefa.setdefault("prioridade", "Média")
+                tarefa.setdefault("autor_nome", tarefa.get("autor", "—"))
+                tarefa.setdefault("data_hora", tarefa.get("data", ""))
+                novas_tarefas.append(tarefa)
+        nd["tarefas"] = novas_tarefas
+
+        # posts antigos guardavam e-mail como autor -> mantém compatível
+        for post in nd.get("atualizacoes", []):
+            if "autor_nome" not in post:
+                autor_antigo = post.get("autor", "—")
+                usuario_ref = dados.get("usuarios", {}).get(autor_antigo)
+                post["autor_nome"] = usuario_ref["nome"] if usuario_ref else autor_antigo
+
+    # usuários antigos sem nome cadastrado
+    for email, u in dados.get("usuarios", {}).items():
+        u.setdefault("nome", email.split("@")[0].title())
+
+    return dados
+
+
+def salvar_banco():
+    dados = {
+        "usuarios": st.session_state.usuarios,
+        "nucleos_dados": st.session_state.nucleos_dados,
+        "caixa_entrada": st.session_state.caixa_entrada
+    }
+    with open(ARQUIVO_BANCO, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False)
+
+
+if "dados_carregados" not in st.session_state:
+    dados = carregar_banco()
+    st.session_state.usuarios = dados["usuarios"]
+    st.session_state.nucleos_dados = dados["nucleos_dados"]
+    st.session_state.caixa_entrada = dados["caixa_entrada"]
+    st.session_state.dados_carregados = True
+
+if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = None
+if "modo_tela" not in st.session_state: st.session_state.modo_tela = "login"
+if "nucleo_selecionado" not in st.session_state: st.session_state.nucleo_selecionado = "Comunicação"
+if "idioma" not in st.session_state: st.session_state.idioma = "pt"
+if "busca" not in st.session_state: st.session_state.busca = ""
+
+
+# ==========================================
+# 3. HELPERS DE IMAGEM
+# ==========================================
+@st.cache_data(show_spinner=False)
+def imagem_base64(caminho):
+    if not os.path.exists(caminho):
+        return None
+    with open(caminho, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
+@st.cache_data(show_spinner=False)
+def banner_base64(caminho, proporcao=21 / 6):
+    """Recorta a imagem para o formato padrão de banner de site (bem panorâmico) e retorna em base64."""
+    if not os.path.exists(caminho):
+        return None
+    im = Image.open(caminho).convert("RGB")
+    w, h = im.size
+    razao_atual = w / h
+    if razao_atual > proporcao:
+        novo_w = int(h * proporcao)
+        left = (w - novo_w) // 2
+        box = (left, 0, left + novo_w, h)
+    else:
+        novo_h = int(w / proporcao)
+        top = (h - novo_h) // 2
+        box = (0, top, w, top + novo_h)
+    recorte = im.crop(box).resize((1600, int(1600 / proporcao)))
+    buf = io.BytesIO()
+    recorte.save(buf, format="JPEG", quality=88)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+# ==========================================
+# 4. PROCESSA PARÂMETROS DE NAVEGAÇÃO (barra flutuante em HTML puro)
+# ==========================================
+qp = st.query_params
+
+if st.session_state.usuario_logado is not None:
+    if qp.get("acao") == "sair":
+        st.session_state.usuario_logado = None
+        st.query_params.clear()
+        st.rerun()
+
+    if "nucleo" in qp and qp.get("nucleo") in NUCLEOS_INFO:
+        st.session_state.nucleo_selecionado = qp.get("nucleo")
+    if "idioma" in qp and qp.get("idioma") in ("pt", "en"):
+        st.session_state.idioma = qp.get("idioma")
+    if "busca" in qp:
+        st.session_state.busca = qp.get("busca")
+
+
+# ==========================================
+# ÁREA PÚBLICA (LOGIN / CADASTRO)
+# ==========================================
+if st.session_state.usuario_logado is None:
+
+    login_bg = imagem_base64(LOGIN_BG_PATH)
+    bg_css = f"url(data:image/jpeg;base64,{login_bg})" if login_bg else "none"
+
+    st.markdown(f"""
+        <style>
+        .stApp {{
+            background-image: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.8)), {bg_css};
+            background-size: cover; background-position: center; background-attachment: fixed;
+        }}
+        header {{visibility: hidden;}}
+
+        html, body, [class*="css"] {{
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, Arial, sans-serif !important;
+        }}
+
+        .login-container {{ margin-top: -20px; }}
+
+        .stTextInput>div>div>input {{
+            background-color: #ffffff !important;
+            border: 1px solid #d2d2d7 !important;
+            border-radius: 10px !important;
+            color: #1d1d1f !important;
+        }}
+        .stSelectbox>div>div>div {{
+            background-color: #ffffff !important;
+            border-radius: 10px !important;
+            color: #1d1d1f !important;
+        }}
+
+        p, label, h2, h4 {{ color: white !important; }}
+
+        .stButton>button {{
+            border-radius: 980px !important;
+            font-weight: 600 !important;
+            background-color: #ffffff !important;
+            color: #1d1d1f !important;
+            border: none !important;
+            padding: 0.5rem 1.4rem !important;
+        }}
+        .stButton>button * {{ color: #1d1d1f !important; }}
+        .stButton>button:hover {{ background-color: #f2f2f2 !important; }}
+        </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1.2, 1, 1.2])
+
+    with col2:
+        st.markdown("<div class='login-container'>", unsafe_allow_html=True)
+        st.write("")
+
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, use_container_width=True)
+        else:
+            st.markdown("<h2 style='text-align:center;'>Sistema IMLA</h2>", unsafe_allow_html=True)
+
+        if st.session_state.modo_tela == "login":
+            st.markdown("<h4 style='text-align:center; font-size:18px;'>Acesso ao Sistema IMLA</h4>", unsafe_allow_html=True)
+            usuario_email = st.text_input("Seu Email:")
+            senha_login = st.text_input("Senha:", type="password")
+
+            if st.button("Entrar", use_container_width=True):
+                chave = usuario_email.strip().lower()
+                if chave in st.session_state.usuarios:
+                    if st.session_state.usuarios[chave]["senha"] == senha_login:
+                        st.session_state.usuario_logado = st.session_state.usuarios[chave]
+                        st.session_state.nucleo_selecionado = st.session_state.usuarios[chave]["nucleo"]
+                        st.rerun()
+                    else:
+                        st.error("Senha incorreta.")
+                else:
+                    st.error("Email não encontrado.")
+
+            st.markdown("<p style='text-align:center; font-size:12px; margin-top:10px;'>Ainda não tem acesso?</p>", unsafe_allow_html=True)
+            if st.button("Criar nova conta", use_container_width=True):
+                st.session_state.modo_tela = "cadastro"
+                st.rerun()
+
+        else:
+            st.markdown("<h4 style='text-align:center; font-size:18px;'>Novo Cadastro</h4>", unsafe_allow_html=True)
+            novo_nome = st.text_input("Nome completo:")
+            novo_email = st.text_input("Seu melhor email:")
+            novo_nucleo = st.selectbox("Núcleo que pertence:", list(NUCLEOS_INFO.keys()))
+            nova_senha = st.text_input("Senha:", type="password")
+            confirmar_senha = st.text_input("Confirmar senha:", type="password")
+
+            if st.button("Finalizar Cadastro", use_container_width=True):
+                chave = novo_email.strip().lower()
+                if not (novo_nome.strip() and chave and nova_senha.strip() and confirmar_senha.strip()):
+                    st.error("Preencha todos os campos.")
+                elif nova_senha != confirmar_senha:
+                    st.error("As senhas não coincidem.")
+                elif chave in st.session_state.usuarios:
+                    st.warning("Este email já está cadastrado.")
+                else:
+                    st.session_state.usuarios[chave] = {
+                        "nome": novo_nome.strip(),
+                        "email": chave,
+                        "nucleo": novo_nucleo,
+                        "senha": nova_senha
+                    }
+                    salvar_banco()
+                    st.success("Cadastro realizado!")
+                    st.session_state.modo_tela = "login"
+                    st.rerun()
+
+            if st.button("Voltar", use_container_width=True):
+                st.session_state.modo_tela = "login"
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ==========================================
+# ÁREA PRIVADA (SISTEMA INTERNO)
+# ==========================================
 else:
-    # Barra Superior (Ilha Flutuante)
-    st.markdown('<div class="nav-bar">', unsafe_allow_html=True)
-    cols = st.columns([1, 6, 2])
-    with cols[0]: st.write("### IMLA")
-    with cols[1]:
-        sub_cols = st.columns(len(st.session_state.db["nucleos"]))
-        for i, n in enumerate(st.session_state.db["nucleos"].keys()):
-            if sub_cols[i].button(n): st.session_state.nucleo_atual = n; st.rerun()
-    with cols[2]:
-        with st.popover(f"👤 {st.session_state.user['nome']}"):
-            st.write(f"**{st.session_state.user['nome']}**")
-            st.write(f"Núcleo: {st.session_state.user['nucleo']}")
-            if st.button("Sair"): st.session_state.user = None; st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    usuario = st.session_state.usuario_logado
+    n_sel = st.session_state.nucleo_selecionado
+    idioma_atual = st.session_state.idioma
+    idioma_alvo = "en" if idioma_atual == "pt" else "pt"
+    logo_b64 = imagem_base64(LOGO_PATH)
+    banner_b64 = banner_base64(BANNER_PATH)
+    iniciais = "".join([p[0].upper() for p in usuario["nome"].split()[:2]]) or "?"
 
-    # Conteúdo Principal
-    st.image("IMG_3985.JPG", use_container_width=True) # Certifique-se que o arquivo está na pasta
-    st.title(f"Área: {st.session_state.nucleo_atual}")
+    st.markdown(f"""
+        <style>
+        .stApp {{ background: #fafafa !important; }}
+        header {{visibility: hidden;}}
 
-    t1, t2, t3 = st.tabs(["Feed", "Tarefas (Kanban)", "Solicitações"])
+        html, body, [class*="css"] {{
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, Arial, sans-serif !important;
+        }}
+        h1 {{ font-weight: 600 !important; color: #1d1d1f !important; }}
+        h2, h3, h4, p, span {{ color: #1d1d1f !important; }}
 
-    with t1:
-        st.subheader("Atualizações")
-        if st.session_state.user["nucleo"] == st.session_state.nucleo_atual:
-            msg = st.text_input("Nova atualização para o núcleo:")
-            if st.button("Publicar"):
-                st.session_state.db["nucleos"][st.session_state.nucleo_atual]["feed"].insert(0, f"{st.session_state.user['nome']}: {msg}")
-                save_db(); st.rerun()
-        for post in st.session_state.db["nucleos"][st.session_state.nucleo_atual]["feed"]:
-            st.markdown(f'<div class="card">{post}</div>', unsafe_allow_html=True)
+        .block-container {{ padding-top: 0rem !important; }}
 
-    with t2:
-        # Kanban Trello Style
-        if st.session_state.user["nucleo"] == st.session_state.nucleo_atual:
-            new_task = st.text_input("Adicionar tarefa...")
-            if st.button("Criar Tarefa"):
-                st.session_state.db["nucleos"][st.session_state.nucleo_atual]["tarefas"]["fazer"].append(new_task)
-                save_db(); st.rerun()
-        
-        k1, k2, k3 = st.columns(3)
-        cols_map = {"fazer": k1, "progresso": k2, "concluido": k3}
-        for status, col in cols_map.items():
+        /* ---------- ILHA FLUTUANTE (NAVBAR) ---------- */
+        .ilha-flutuante {{
+            position: fixed;
+            top: 14px; left: 50%;
+            transform: translateX(-50%);
+            width: min(96%, 1200px);
+            z-index: 9999;
+            background: rgba(255,255,255,0.72);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: 980px;
+            border: 1px solid rgba(255,255,255,0.4);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+            padding: 8px 20px;
+            display: flex; align-items: center; gap: 18px;
+            flex-wrap: nowrap; overflow-x: auto;
+        }}
+        .ilha-logo {{ height: 30px; border-radius: 8px; flex-shrink:0; }}
+        .ilha-nome {{ font-weight: 700; font-size: 15px; color:#1d1d1f; white-space:nowrap; }}
+        .ilha-pills {{ display:flex; gap:6px; flex-wrap: nowrap; }}
+        .ilha-pill {{
+            text-decoration:none; font-size:12.5px; font-weight:600; color:#1d1d1f !important;
+            background: rgba(0,0,0,0.05); padding:7px 12px; border-radius:980px; white-space:nowrap;
+            transition: 0.15s;
+        }}
+        .ilha-pill:hover {{ background: rgba(0,0,0,0.1); }}
+        .ilha-pill.ativa {{ background:#1d1d1f; color:#ffffff !important; }}
+        .ilha-busca input {{
+            border:none; background: rgba(0,0,0,0.05); border-radius:980px; padding:7px 14px;
+            font-size:12.5px; width:130px; color:#1d1d1f;
+        }}
+        .ilha-icone {{
+            text-decoration:none; color:#1d1d1f !important; font-size:15px; background: rgba(0,0,0,0.05);
+            border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+            flex-shrink:0;
+        }}
+        .ilha-perfil {{ margin-left: auto; flex-shrink:0; }}
+        .ilha-perfil summary {{
+            list-style:none; cursor:pointer; width:32px; height:32px; border-radius:50%;
+            background:#0071e3; color:white !important; display:flex; align-items:center; justify-content:center;
+            font-size:12px; font-weight:700;
+        }}
+        .ilha-perfil summary::-webkit-details-marker {{ display:none; }}
+        .ilha-perfil[open] summary {{ background:#004c99; }}
+        .painel-perfil {{
+            position:absolute; right:0; top:44px; background:white; border-radius:16px;
+            box-shadow:0 10px 30px rgba(0,0,0,0.2); padding:16px 18px; width:230px; text-align:left;
+        }}
+        .painel-perfil .nome {{ font-weight:700; font-size:14px; color:#1d1d1f; }}
+        .painel-perfil .info {{ font-size:12px; color:#6e6e73; margin-top:2px; }}
+        .painel-perfil a.sair {{
+            display:block; margin-top:12px; text-align:center; background:#ff3b30; color:white !important;
+            text-decoration:none; padding:7px; border-radius:980px; font-size:12.5px; font-weight:600;
+        }}
+
+        /* ---------- BANNER ---------- */
+        .banner-imla {{
+            margin-top: 70px;
+            width: 100%; height: 260px; border-radius: 24px; overflow:hidden;
+            background-image: linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.55)), url(data:image/jpeg;base64,{banner_b64 if banner_b64 else ''});
+            background-size: cover; background-position: center;
+            display:flex; align-items:flex-end; padding: 26px 34px;
+        }}
+        .banner-imla h1 {{ color:white !important; font-size: 40px; margin:0; }}
+        .banner-imla p {{ color: rgba(255,255,255,0.85) !important; margin:0; font-size:15px; }}
+
+        div.stButton > button:first-child {{
+            background-color: transparent; border: none; box-shadow: none; padding: 10px;
+            color: #1d1d1f !important; border-radius: 15px; transition: 0.2s;
+        }}
+        div.stButton > button:first-child:hover {{ background-color: rgba(0,0,0,0.05); }}
+
+        .apple-card {{
+            background: #ffffff; border-radius: 20px; padding: 22px; margin-bottom: 18px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+            border: 1px solid rgba(0,0,0,0.02);
+        }}
+        .card-tag {{ font-size: 11px; font-weight: 700; color: #59c2d1; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px;}}
+        .card-title {{ font-size: 16px; font-weight: 600; margin-bottom: 8px;}}
+        .card-text {{ font-size: 14px; color: #515154; line-height: 1.5;}}
+        .card-footer {{ font-size: 10px; color: #86868b; margin-top: 14px;}}
+
+        /* ---------- CARDS DE TAREFA (TRELLO-LIKE) ---------- */
+        .task-card {{
+            background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:12px;
+            box-shadow:0 2px 10px rgba(0,0,0,0.05); border-left: 5px solid #ccc;
+        }}
+        .task-titulo {{ font-weight:600; font-size:14px; margin-bottom:8px; }}
+        .chip {{
+            display:inline-block; font-size:10.5px; font-weight:700; color:white; padding:3px 9px;
+            border-radius:980px; margin-right:6px;
+        }}
+        .task-footer {{ font-size:10.5px; color:#86868b; margin-top:10px; }}
+        .kanban-col-title {{ font-size:13px; font-weight:700; color:#6e6e73; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;}}
+
+        /* ---------- MAPA MENTAL / ORGANOGRAMA ---------- */
+        .mapa-container {{ position:relative; width:100%; height:420px; margin: 10px 0 30px 0; }}
+        .mapa-centro {{
+            position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:96px; height:96px; border-radius:50%; background:white; box-shadow:0 6px 24px rgba(0,0,0,0.12);
+            display:flex; align-items:center; justify-content:center; overflow:hidden; z-index:3; border: 3px solid #f2f2f2;
+        }}
+        .mapa-centro img {{ width:72%; }}
+        .mapa-no {{
+            position:absolute; transform:translate(-50%,-50%); z-index:2; display:flex; flex-direction:column;
+            align-items:center; text-align:center; gap:6px;
+        }}
+        .mapa-bola {{
+            width:64px; height:64px; border-radius:50%; background:white; box-shadow:0 4px 16px rgba(0,0,0,0.1);
+            display:flex; align-items:center; justify-content:center; font-size:26px; border: 3px solid #eef6f7;
+        }}
+        .mapa-nome {{ font-size:12px; font-weight:600; color:#1d1d1f; max-width:100px; }}
+        </style>
+    """, unsafe_allow_html=True)
+
+    # ---------- MONTA A ILHA FLUTUANTE (HTML puro, navegação via query params) ----------
+    pills_html = ""
+    for nome, emoji in NUCLEOS_INFO.items():
+        ativa = "ativa" if nome == n_sel else ""
+        pills_html += f'<a class="ilha-pill {ativa}" href="?nucleo={nome}&idioma={idioma_atual}">{emoji} {nome}</a>'
+
+    logo_tag = f'<img class="ilha-logo" src="data:image/png;base64,{logo_b64}">' if logo_b64 else ""
+
+    navbar_html = f"""
+    <div class="ilha-flutuante">
+        {logo_tag}
+        <span class="ilha-nome">{t('titulo_sistema')}</span>
+        <div class="ilha-pills">{pills_html}</div>
+        <form class="ilha-busca" method="get" style="margin:0;">
+            <input type="hidden" name="nucleo" value="{n_sel}">
+            <input type="hidden" name="idioma" value="{idioma_atual}">
+            <input type="text" name="busca" placeholder="🔍 {t('buscar_placeholder')}" value="{st.session_state.busca}">
+        </form>
+        <a class="ilha-icone" title="PT / EN" href="?nucleo={n_sel}&idioma={idioma_alvo}">🌐</a>
+        <details class="ilha-perfil">
+            <summary>{iniciais}</summary>
+            <div class="painel-perfil">
+                <div class="nome">{usuario['nome']}</div>
+                <div class="info">{t('email_label')}: {usuario['email']}</div>
+                <div class="info">{t('nucleo_label')}: {NUCLEOS_INFO.get(usuario['nucleo'],'')} {usuario['nucleo']}</div>
+                <a class="sair" href="?acao=sair">{t('sair')}</a>
+            </div>
+        </details>
+    </div>
+    """
+    st.markdown(navbar_html, unsafe_allow_html=True)
+
+    # ---------- BANNER ----------
+    st.markdown(f"""
+        <div class="banner-imla">
+            <div>
+                <h1>{t('titulo_sistema')}</h1>
+                <p>{t('subtitulo')}</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.session_state.busca:
+        col_b1, col_b2 = st.columns([6, 1])
+        with col_b1:
+            st.info(f"🔍 {t('buscar_placeholder')} \"{st.session_state.busca}\"")
+        with col_b2:
+            st.markdown(f'<a href="?nucleo={n_sel}&idioma={idioma_atual}">✕ Limpar</a>', unsafe_allow_html=True)
+
+    # ---------- MAPA MENTAL DOS NÚCLEOS ----------
+    n_total = len(NUCLEOS_INFO)
+    raio_x, raio_y = 42, 38
+    nos_html = ""
+    for i, (nome, emoji) in enumerate(NUCLEOS_INFO.items()):
+        angulo = (2 * math.pi * i / n_total) - math.pi / 2
+        x = 50 + raio_x * math.cos(angulo)
+        y = 50 + raio_y * math.sin(angulo)
+        nos_html += f"""
+        <div class="mapa-no" style="left:{x}%; top:{y}%;">
+            <div class="mapa-bola">{emoji}</div>
+            <div class="mapa-nome">{nome}</div>
+        </div>
+        """
+        cx, cy = 50 + raio_x * math.cos(angulo), 50 + raio_y * math.sin(angulo)
+
+    linhas_svg = ""
+    for i in range(n_total):
+        angulo = (2 * math.pi * i / n_total) - math.pi / 2
+        x = 50 + raio_x * math.cos(angulo)
+        y = 50 + raio_y * math.sin(angulo)
+        linhas_svg += f'<line x1="50" y1="50" x2="{x}" y2="{y}" stroke="#d6d6d8" stroke-width="0.4" vector-effect="non-scaling-stroke"/>'
+
+    logo_centro_tag = f'<img src="data:image/png;base64,{logo_b64}">' if logo_b64 else "🕊️"
+
+    st.markdown(f"""
+    <div class="mapa-container">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute; width:100%; height:100%;">
+            {linhas_svg}
+        </svg>
+        <div class="mapa-centro">{logo_centro_tag}</div>
+        {nos_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+
+    st.markdown(f"<h2 style='font-size: 30px;'>{NUCLEOS_INFO.get(n_sel,'')} {n_sel}</h2>", unsafe_allow_html=True)
+
+    aba_feed, aba_tarefas, aba_solicitacoes = st.tabs([t("aba_novidades"), t("aba_tarefas"), t("aba_solicitacoes")])
+
+    # ================= ABA NOVIDADES =================
+    with aba_feed:
+        if usuario['nucleo'] == n_sel:
+            with st.form("form_novo"):
+                texto = st.text_area(t("compartilhar") + ":")
+                if st.form_submit_button(t("publicar")) and texto.strip():
+                    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                    st.session_state.nucleos_dados[n_sel]["atualizacoes"].insert(0, {
+                        "texto": texto,
+                        "data": agora,
+                        "autor_nome": usuario["nome"],
+                        "autor_email": usuario["email"]
+                    })
+                    salvar_banco()
+                    st.rerun()
+
+        st.write("")
+        col_c1, col_c2, col_c3 = st.columns(3)
+        posts = st.session_state.nucleos_dados[n_sel]["atualizacoes"]
+
+        busca_lower = st.session_state.busca.lower().strip()
+        if busca_lower:
+            posts = [p for p in posts if busca_lower in p.get("texto", "").lower()]
+
+        if not posts:
+            st.caption("Nenhuma atualização ainda.")
+
+        for i, p in enumerate(posts):
+            col = [col_c1, col_c2, col_c3][i % 3]
             with col:
-                st.markdown(f"#### {status.capitalize()}")
-                tasks = st.session_state.db["nucleos"][st.session_state.nucleo_atual]["tarefas"][status]
-                for idx, task in enumerate(tasks):
-                    st.markdown(f'<div class="card">{task}</div>', unsafe_allow_html=True)
-                    # Botão para mover tarefas
-                    if st.button(f"Mover →", key=f"btn_{status}_{idx}"):
-                        # Lógica simples de mover para o próximo status
-                        st.session_state.db["nucleos"][st.session_state.nucleo_atual]["tarefas"][status].pop(idx)
-                        save_db(); st.rerun()
+                st.markdown(f"""
+                <div class='apple-card'>
+                    <div class='card-tag'>NOVO</div>
+                    <div class='card-title'>{p.get('autor_nome','—')}</div>
+                    <div class='card-text'>{p['texto']}</div>
+                    <div class='card-footer'>{p['data']}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-    with t3:
-        st.subheader("Solicitações Entre Núcleos")
-        nucleos_lista = list(st.session_state.db["nucleos"].keys())
-        target = st.selectbox("Para qual núcleo enviar?", nucleos_lista)
-        solicitacao = st.text_area("Descrição da solicitação:")
-        if st.button("Enviar Solicitação"):
-            st.session_state.db["nucleos"][target]["solicitacoes"].append(f"De: {st.session_state.nucleo_atual} | {solicitacao}")
-            save_db(); st.success("Enviado!")
-        
+    # ================= ABA TAREFAS (ESTILO TRELLO) =================
+    with aba_tarefas:
+        c_link1, c_link2 = st.columns(2)
+        c_link1.link_button(t("acessar_drive"), st.session_state.nucleos_dados[n_sel]["drive"])
+        c_link2.link_button(t("cronogramas"), st.session_state.nucleos_dados[n_sel]["planilha"])
         st.divider()
-        st.write("Caixa de Entrada:")
-        for s in st.session_state.db["nucleos"][st.session_state.nucleo_atual]["solicitacoes"]:
-            st.info(s)
+
+        pode_editar = usuario['nucleo'] == n_sel
+
+        if pode_editar:
+            with st.expander(f"➕ {t('nova_demanda')}"):
+                with st.form("form_nova_tarefa", clear_on_submit=True):
+                    novo_titulo = st.text_input(t("titulo_demanda"))
+                    nova_prioridade = st.selectbox(t("prioridade"), PRIORIDADE_OPCOES, index=1)
+                    if st.form_submit_button(t("adicionar_demanda")) and novo_titulo.strip():
+                        agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                        st.session_state.nucleos_dados[n_sel]["tarefas"].append({
+                            "id": str(uuid.uuid4())[:8],
+                            "titulo": novo_titulo.strip(),
+                            "status": "Criada",
+                            "prioridade": nova_prioridade,
+                            "autor_nome": usuario["nome"],
+                            "data_hora": agora
+                        })
+                        salvar_banco()
+                        st.rerun()
+        else:
+            st.caption(t("restrito_edicao"))
+
+        tarefas = st.session_state.nucleos_dados[n_sel]["tarefas"]
+        if busca_lower:
+            tarefas = [tf for tf in tarefas if busca_lower in tf.get("titulo", "").lower()]
+
+        col_k1, col_k2, col_k3 = st.columns(3)
+        colunas_kanban = {STATUS_OPCOES[0]: col_k1, STATUS_OPCOES[1]: col_k2, STATUS_OPCOES[2]: col_k3}
+
+        for status_nome, coluna in colunas_kanban.items():
+            with coluna:
+                st.markdown(f"<div class='kanban-col-title'>{status_nome}</div>", unsafe_allow_html=True)
+                tarefas_col = [tf for tf in tarefas if tf.get("status") == status_nome]
+                if not tarefas_col:
+                    st.caption("—")
+                for tf in tarefas_col:
+                    cor_prio = PRIORIDADE_COR.get(tf.get("prioridade", "Média"), "#8e8e93")
+                    st.markdown(f"""
+                    <div class="task-card" style="border-left-color:{cor_prio};">
+                        <div class="task-titulo">{tf['titulo']}</div>
+                        <span class="chip" style="background:{cor_prio};">{tf.get('prioridade','Média')}</span>
+                        <div class="task-footer">{t('criado_por')} {tf.get('autor_nome','—')} · {tf.get('data_hora','')}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    if pode_editar:
+                        with st.expander(t("editar"), expanded=False):
+                            with st.form(f"editar_{tf['id']}"):
+                                titulo_edit = st.text_input(t("titulo_demanda"), value=tf["titulo"], key=f"tit_{tf['id']}")
+                                status_edit = st.selectbox(t("status"), STATUS_OPCOES, index=STATUS_OPCOES.index(tf.get("status", "Criada")), key=f"sta_{tf['id']}")
+                                prio_edit = st.selectbox(t("prioridade"), PRIORIDADE_OPCOES, index=PRIORIDADE_OPCOES.index(tf.get("prioridade", "Média")), key=f"pri_{tf['id']}")
+                                if st.form_submit_button(t("salvar")):
+                                    tf["titulo"] = titulo_edit.strip() or tf["titulo"]
+                                    tf["status"] = status_edit
+                                    tf["prioridade"] = prio_edit
+                                    salvar_banco()
+                                    st.rerun()
+
+    # ================= ABA SOLICITAÇÕES =================
+    with aba_solicitacoes:
+        st.markdown(f"#### {t('enviar_solicitacao')}")
+        with st.form("form_sol", clear_on_submit=True):
+            dest = st.selectbox(t("para_nucleo"), list(NUCLEOS_INFO.keys()))
+            assunto = st.text_input(t("assunto") + ":")
+            msg = st.text_area(t("mensagem") + ":")
+            if st.form_submit_button(t("enviar")) and assunto.strip():
+                agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                st.session_state.caixa_entrada[dest].append({
+                    "assunto": assunto,
+                    "mensagem": msg,
+                    "data": agora,
+                    "de_nome": usuario["nome"],
+                    "de_nucleo": usuario["nucleo"]
+                })
+                salvar_banco()
+                st.success(t("enviado"))
+
+        st.write(f"### {t('caixa_entrada')}")
+        if usuario['nucleo'] == n_sel:
+            caixa = st.session_state.caixa_entrada[n_sel]
+            if not caixa:
+                st.caption("Nenhuma solicitação recebida ainda.")
+            for m in reversed(caixa):
+                with st.expander(f"📩 {m['assunto']} ({t('de')}: {m.get('de_nome','—')} · {m.get('de_nucleo','')})"):
+                    st.write(m['mensagem'])
+                    st.caption(m['data'])
+        else:
+            st.error(t("restrito_caixa"))
