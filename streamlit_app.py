@@ -73,7 +73,7 @@ TEXTOS = {
         "buscar_placeholder": "Buscar...",
         "aba_novidades": "Novidades",
         "aba_tarefas": "Demandas",
-        "aba_lembretes": "Lembrete",
+        "aba_lembretes": "Lembretes",
         "aba_solicitacoes": "Solicitações",
         "compartilhar": "Compartilhar algo novo",
         "publicar": "Publicar",
