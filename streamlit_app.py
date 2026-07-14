@@ -532,6 +532,17 @@ else:
             text-align: center !important;
             line-height: 1.2 !important;
         }}
+        .st-key-navbar_container .stButton>button > div {{
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }}
+        .st-key-navbar_container .stButton>button p {{
+            width: 100% !important;
+            margin: 0 !important;
+            text-align: center !important;
+        }}
         .st-key-navbar_container .stButton>button p {{
             text-align: center !important;
             width: 100%;
@@ -658,6 +669,10 @@ else:
         /* ---------- RESPONSIVO (CELULAR) ---------- */
         @media (max-width: 700px) {{
             .st-key-navbar_container {{ padding: 6px 10px; border-radius: 20px; top: 4px; }}
+            .st-key-navbar_container .stButton>button {{
+                font-size: 10.5px !important;
+                padding: 0.4rem 0.5rem !important;
+            }}
             .banner-imla {{ height: 190px; padding: 18px 20px; border-radius:18px; }}
             .banner-imla h1 {{ font-size: 26px; }}
             .banner-imla p {{ font-size: 12px; }}
