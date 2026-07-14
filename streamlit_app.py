@@ -579,11 +579,21 @@ else:
             display:flex; align-items:flex-end; padding: 26px 34px;
         }}
         .banner-imla h1 {{
-            color:#ffffff !important; font-size: 40px; margin:0; font-weight:700 !important;
+            color:#ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            background: none !important;
+            -webkit-background-clip: initial !important;
+            background-clip: initial !important;
+            font-size: 40px; margin:0; font-weight:700 !important;
             text-shadow: 0 2px 14px rgba(0,0,0,0.7);
         }}
         .banner-imla p {{
-            color: #ffffff !important; margin:0; font-size:15px; opacity:0.95;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            background: none !important;
+            -webkit-background-clip: initial !important;
+            background-clip: initial !important;
+            margin:0; font-size:15px; opacity:0.95;
             text-shadow: 0 1px 10px rgba(0,0,0,0.65);
         }}
 
@@ -650,7 +660,7 @@ else:
 
     # ---------- NAVBAR (contêiner real do Streamlit, sem <a href> nem reload) ----------
     with st.container(key="navbar_container"):
-        pesos_nucleos = [0.55 + len(nome) * 0.045 for nome in NUCLEOS_INFO]
+        pesos_nucleos = [0.55 + (len(nome) + 3) * 0.045 for nome in NUCLEOS_INFO]
         larguras = [0.55] + pesos_nucleos + [0.45]
         cols = st.columns(larguras, vertical_alignment="center")
 
@@ -661,7 +671,7 @@ else:
         for i, (nome, emoji) in enumerate(NUCLEOS_INFO.items(), start=1):
             with cols[i]:
                 tipo_botao = "primary" if nome == n_sel else "secondary"
-                if st.button(f"{emoji} {nome}", key=f"nuc_{nome}", type=tipo_botao, use_container_width=True):
+                if st.button(f"{emoji} ({nome})", key=f"nuc_{nome}", type=tipo_botao, use_container_width=True):
                     st.session_state.nucleo_selecionado = nome
                     st.session_state.mostrar_perfil = False
                     st.rerun()
@@ -699,8 +709,8 @@ else:
     st.markdown(f"""
         <div class="banner-imla">
             <div>
-                <h1 style="color:#ffffff !important;">{t('titulo_sistema')}</h1>
-                <p style="color:#ffffff !important;">{t('subtitulo')}</p>
+                <h1 style="color:#ffffff !important; -webkit-text-fill-color:#ffffff !important;">{t('titulo_sistema')}</h1>
+                <p style="color:#ffffff !important; -webkit-text-fill-color:#ffffff !important;">{t('subtitulo')}</p>
             </div>
         </div>
     """, unsafe_allow_html=True)
