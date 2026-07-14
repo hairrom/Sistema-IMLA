@@ -63,7 +63,7 @@ STATUS_COR = {"Criada": "#8e8e93", "Em andamento": "#0071e3", "Concluída": "#34
 TEXTOS = {
     "pt": {
         "titulo_sistema": "Sistema IMLA",
-        "subtitulo": "Onde nós trabalhamos",
+        "subtitulo": "Onde nós trabalhamos!",
         "sair": "Sair",
         "encolher": "Encolher",
         "perfil": "Perfil",
@@ -71,9 +71,9 @@ TEXTOS = {
         "nucleo_label": "Núcleo",
         "email_label": "E-mail",
         "buscar_placeholder": "Buscar...",
-        "aba_novidades": "As novidades",
+        "aba_novidades": "Novidades",
         "aba_tarefas": "Demandas",
-        "aba_lembretes": "Lembretes",
+        "aba_lembretes": "Avisos",
         "aba_solicitacoes": "Solicitações",
         "compartilhar": "Compartilhar algo novo",
         "publicar": "Publicar",
