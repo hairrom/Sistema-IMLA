@@ -520,13 +520,13 @@ else:
             border-radius: 980px !important;
             font-size: 12px !important;
             font-weight: 600 !important;
-            padding: 0.4rem 0.6rem !important;
+            padding: 0.45rem 0.75rem !important;
             border: none !important;
-            white-space: normal !important;
-            overflow-wrap: break-word;
-            word-break: keep-all;
-            line-height: 1.25 !important;
-            min-height: 2.2rem;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            display: block !important;
+            line-height: 1.2 !important;
         }}
         .st-key-navbar_container button[kind="secondary"] {{
             background-color: #ffffff !important;
@@ -660,7 +660,7 @@ else:
 
     # ---------- NAVBAR (contêiner real do Streamlit, sem <a href> nem reload) ----------
     with st.container(key="navbar_container"):
-        pesos_nucleos = [0.55 + (len(nome) + 3) * 0.045 for nome in NUCLEOS_INFO]
+        pesos_nucleos = [0.5 + len(nome) * 0.05 for nome in NUCLEOS_INFO]
         larguras = [0.55] + pesos_nucleos + [0.45]
         cols = st.columns(larguras, vertical_alignment="center")
 
@@ -671,7 +671,7 @@ else:
         for i, (nome, emoji) in enumerate(NUCLEOS_INFO.items(), start=1):
             with cols[i]:
                 tipo_botao = "primary" if nome == n_sel else "secondary"
-                if st.button(f"{emoji} ({nome})", key=f"nuc_{nome}", type=tipo_botao, use_container_width=True):
+                if st.button(f"{emoji} {nome}", key=f"nuc_{nome}", type=tipo_botao, use_container_width=True):
                     st.session_state.nucleo_selecionado = nome
                     st.session_state.mostrar_perfil = False
                     st.rerun()
