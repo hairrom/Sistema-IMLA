@@ -525,8 +525,15 @@ else:
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-            display: block !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
             line-height: 1.2 !important;
+        }}
+        .st-key-navbar_container .stButton>button p {{
+            text-align: center !important;
+            width: 100%;
         }}
         .st-key-navbar_container button[kind="secondary"] {{
             background-color: #ffffff !important;
