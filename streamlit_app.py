@@ -517,10 +517,11 @@ else:
             width: 100%;
         }}
         .st-key-navbar_container .stButton>button {{
+            width: 100% !important;
             border-radius: 980px !important;
             font-size: 12px !important;
             font-weight: 600 !important;
-            padding: 0.45rem 0.75rem !important;
+            padding: 0.5rem 1rem !important;
             border: none !important;
             white-space: nowrap !important;
             overflow: hidden !important;
