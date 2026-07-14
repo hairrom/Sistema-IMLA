@@ -93,7 +93,7 @@ TEXTOS = {
         "status": "Status",
         "restrito_edicao": "🔒 Apenas membros deste núcleo podem editar.",
         "novo_lembrete": "Novo lembrete",
-        "titulo_lembrete": "Nome da tarefa recorrente",
+        "titulo_lembrete": "Nome da tarefa",
         "descricao_lembrete": "O que precisa ser feito",
         "proxima_data": "Próxima data",
         "adicionar_lembrete": "💾 Salvar",
