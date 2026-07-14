@@ -99,7 +99,7 @@ TEXTOS = {
         "adicionar_lembrete": "💾 Salvar",
         "sem_lembretes": "Nenhum lembrete cadastrado.",
         "enviar_solicitacao": "Enviar solicitação",
-        "para_nucleo": "Para qual núcleo?",
+        "para_nucleo": "Para qual setor?",
         "assunto": "Assunto",
         "mensagem": "Mensagem",
         "visibilidade": "Visibilidade",
