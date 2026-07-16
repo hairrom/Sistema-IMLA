@@ -2280,4 +2280,3 @@ elif menu_selecionado == "🌊 Tábua da Maré":
                     st.info("Nenhuma avaliação cadastrada.")
     else:
         st.warning("A sala selecionada está temporariamente sem registros ou dados associados.")
-```
