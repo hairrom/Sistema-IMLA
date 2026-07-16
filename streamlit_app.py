@@ -1,15 +1,4 @@
-Aqui está a consolidação completa e integrada dos dois sistemas em um único arquivo (`app.py`). 
-
-A integração foi estruturada preservando a integridade de todas as regras de negócio, persistências locais (JSON e CSV) e conexões com o Google Sheets (`GSheetsConnection` e `gspread`). Foi criado um sistema unificado de login com controle de perfis dinâmico (Coordenação/Admin, Equipe/Staff, Visitante e Padrinho) e uma barra de navegação responsiva e minimalista baseada em `st.session_state` [1].
-
-O visual foi refinado com um estilo sofisticado, adotando uma paleta elegante em azul escuro (`#253a58`) e detalhes em dourado/bronze (`#ab875f`), mantendo a tipografia em escala equilibrada, sem excesso de tamanhos e com ótimo respiro visual.
-
-### Arquivo Consolidado: `app.py`
-
 ```python
-# ==============================================================================
-# --- IMPORTAÇÕES E CONFIGURAÇÃO ---
-# ==============================================================================
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -28,7 +17,7 @@ from PIL import Image
 import streamlit.components.v1 as components
 from streamlit_gsheets import GSheetsConnection
 
-# Tratamento robusto para fuso horário brasileiro
+# Tratamento para fuso horário brasileiro
 try:
     from zoneinfo import ZoneInfo
     FUSO_BR = ZoneInfo("America/Bahia")
@@ -142,7 +131,7 @@ TEXTOS = {
         "restrito_links": "🔒 Faça login para acessar o Drive e as planilhas.", "nova_demanda": "Nova demanda",
         "titulo_demanda": "Título da demanda", "descricao_demanda": "Descrição (o que precisa ser feito)",
         "prioridade": "Prioridade", "adicionar_demanda": "+ Adicionar demanda", "criado_por": "Criado por",
-        "editar": "✏️ Editar", "salvar": "Salvar alterações", "excluir_tarefa": "🗑️ Excluir tarefa",
+        "editar": "✏️ Edit", "salvar": "Salvar alterações", "excluir_tarefa": "🗑️ Excluir tarefa",
         "excluir_lembrete": "🗑️ Excluir lembrete", "status": "Status",
         "restrito_edicao": "🔒 Apenas membros deste núcleo podem editar.", "novo_lembrete": "Novo lembrete",
         "titulo_lembrete": "Nome da tarefa", "descricao_lembrete": "O que precisa ser feito",
@@ -184,7 +173,6 @@ def t(chave):
 # ==============================================================================
 # --- INICIALIZAÇÃO DE CONEXÕES E BANCO DE DADOS ---
 # ==============================================================================
-# Conexão GSheets oficial (cached) [1]
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
@@ -203,7 +191,7 @@ def ler_planilha(worksheet_name: str) -> pd.DataFrame:
         st.warning(f"Não foi possível carregar a aba '{worksheet_name}': {e}")
         return pd.DataFrame()
 
-# Carregamento assíncrono das abas gerais do GSheets
+# Carregamento das planilhas gerais
 df_g = ler_planilha("GERAL")
 df_alf = ler_planilha("TURNO_ESTENDIDO")
 df_aval = ler_planilha("TABUA_MARE")
@@ -1383,7 +1371,7 @@ elif role in ["staff", "visitante"]:
 elif role == "padrinho":
     opcoes_menu = ["🌊 Canal do Apadrinhamento"]
 
-menu_selecionado = st.sidebar.radio("Navegação do Sistema", opcoes_menu)
+menu_selecionado = st.sidebar.radio("Navegação", opcoes_menu)
 
 # Seletor de Idioma para a Intranet
 if "🏠 Intranet IMLA" in opcoes_menu:
@@ -1634,7 +1622,7 @@ if menu_selecionado == "🏠 Intranet IMLA":
         else:
             st.caption(t("visitante_solicitacoes"))
             caixa_pub = [m for m in st.session_state.caixa_entrada[n_sel] if m.get("publica")]
-            if not m_pub:
+            if not caixa_pub:
                 st.caption("Sem solicitações públicas neste núcleo.")
             else:
                 for m in reversed(caixa_pub):
