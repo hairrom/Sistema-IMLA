@@ -1,0 +1,6 @@
+streamlit
+pandas
+plotly
+numpy
+scipy
+st-gsheets-connection
