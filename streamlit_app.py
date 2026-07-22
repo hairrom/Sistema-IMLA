@@ -354,3 +354,86 @@ def tela_login():
                             st.error(msg)
                     else:
                         st.warning("Preencha todos os campos para cadastrar.")
+                        # ==========================================
+# 7. NAVEGAÇÃO PRINCIPAL E ROTEAMENTO (BLOCO 3)
+# ==========================================
+
+def menu_lateral():
+    """Renderiza o menu lateral dinâmico, minimalista e baseado no perfil do usuário."""
+    with st.sidebar:
+        # Cabeçalho da sidebar limpo e sofisticado
+        st.markdown("<h3 style='text-align: center; margin-bottom: 0;'>🕊️ IMLA</h3>", unsafe_allow_html=True)
+        
+        # Identificação discreta do usuário
+        nome = st.session_state.get('nome_usuario', '')
+        perfil = st.session_state.get('perfil', '')
+        st.markdown(
+            f"<p style='text-align: center; font-size: 11px; color: #7f8c8d; margin-top: -5px;'>"
+            f"{nome} <br> <span style='font-size: 9px; text-transform: uppercase; letter-spacing: 1px;'>{perfil}</span>"
+            f"</p>", 
+            unsafe_allow_html=True
+        )
+        st.write("---")
+
+        # Define as rotas disponíveis com base no perfil
+        paginas = []
+        if perfil == "Admin":
+            paginas = ["Início", "Gestão de Núcleos", "Sistema Pedagógico", "Configurações Gerais"]
+        elif perfil == "Equipe":
+            paginas = ["Início", "Meu Núcleo", "Sistema Pedagógico"]
+        elif perfil == "Padrinho":
+            paginas = ["Início", "Acompanhamento Pedagógico"]
+        else:
+            paginas = ["Início"]
+
+        # Menu de navegação limpo, sem label visível para não poluir o visual
+        escolha = st.radio("Navegação", paginas, label_visibility="collapsed")
+        
+        st.write("---")
+        
+        # Botão de logout unificado
+        if st.button("Sair / Logout", use_container_width=True):
+            # Limpa todas as variáveis de sessão para garantir um logout seguro
+            st.session_state.clear() 
+            st.rerun()
+            
+        return escolha
+
+def renderizar_pagina(escolha):
+    """Renderiza o conteúdo da página selecionada (Placeholder temporário)."""
+    if escolha == "Início":
+        st.markdown("<h2>Visão Geral</h2>", unsafe_allow_html=True)
+        st.write("Selecione um módulo no menu lateral.")
+        
+    elif escolha == "Gestão de Núcleos":
+        st.markdown("<h2>Gestão de Núcleos</h2>", unsafe_allow_html=True)
+        st.info("Módulo administrativo em construção...")
+        
+    elif escolha == "Meu Núcleo":
+        nucleo_atual = st.session_state.get('nucleo', '')
+        st.markdown(f"<h2>Área de Trabalho: {nucleo_atual}</h2>", unsafe_allow_html=True)
+        st.info("Ferramentas do núcleo em construção...")
+        
+    elif escolha in ["Sistema Pedagógico", "Acompanhamento Pedagógico"]:
+        st.markdown("<h2>Módulo Pedagógico</h2>", unsafe_allow_html=True)
+        st.info("Integração do painel pedagógico em construção...")
+        
+    elif escolha == "Configurações Gerais":
+        st.markdown("<h2>Configurações</h2>", unsafe_allow_html=True)
+        st.info("Ajustes do sistema em construção...")
+
+def main():
+    """Motor de execução do aplicativo."""
+    # Se não estiver logado, exibe apenas a tela limpa de login
+    if not st.session_state.get("logado", False):
+        tela_login()
+    else:
+        # Se estiver logado, exibe o menu e a página correspondente
+        pagina_selecionada = menu_lateral()
+        renderizar_pagina(pagina_selecionada)
+
+# ==========================================
+# 8. EXECUÇÃO DO SISTEMA
+# ==========================================
+if __name__ == "__main__":
+    main()
