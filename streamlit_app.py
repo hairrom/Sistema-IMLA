@@ -241,3 +241,116 @@ div.stButton > button {{
     line-height: 1; text-transform: lowercase; font-family: 'Nunito', sans-serif !important; }}
 </style>
 """, unsafe_allow_html=True)
+# ==========================================
+# 6. AUTENTICAÇÃO UNIFICADA (BLOCO 2)
+# ==========================================
+
+def registrar_usuario_equipe(usuario, senha, nucleo):
+    """Função auxiliar para cadastrar novos membros da equipe no banco JSON."""
+    banco = carregar_banco_json()
+    if "usuarios" not in banco:
+        banco["usuarios"] = {}
+    
+    if usuario in banco["usuarios"]:
+        return False, "Este usuário já existe!"
+        
+    salt, hash_s = hash_senha(senha)
+    banco["usuarios"][usuario] = {
+        "salt": salt,
+        "hash": hash_s,
+        "nucleo": nucleo,
+        "data_cadastro": str(agora_br())
+    }
+    salvar_banco_json(banco)
+    return True, "Membro da equipe cadastrado com sucesso!"
+
+def tela_login():
+    """Renderiza a tela de login unificada com três perfis de acesso."""
+    
+    # Cria colunas para centralizar o formulário de login de forma elegante
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("<div class='main-header'><h1>🔒 Acesso IMLA</h1></div>", unsafe_allow_html=True)
+        st.write("---")
+        
+        tipo_acesso = st.selectbox(
+            "Selecione seu perfil de acesso:", 
+            ["Equipe (Núcleos)", "Padrinho / Madrinha", "Administração"]
+        )
+        
+        with st.form("form_login"):
+            # Renderiza os campos de forma dinâmica dependendo do perfil escolhido
+            if tipo_acesso == "Equipe (Núcleos)":
+                st.info("Acesso restrito aos membros cadastrados nos Núcleos do IMLA.")
+                usuario = st.text_input("Nome de Usuário")
+                senha = st.text_input("Senha", type="password")
+            
+            elif tipo_acesso == "Padrinho / Madrinha":
+                st.info("Acesso simplificado para acompanhamento do sistema pedagógico.")
+                usuario = st.text_input("Digite seu Nome Completo")
+                senha = None # Padrinhos usam acesso simplificado sem senha neste escopo
+            
+            else: # Administração
+                st.warning("Acesso exclusivo para a gestão geral do sistema.")
+                usuario = st.text_input("Usuário Admin")
+                senha = st.text_input("Senha Admin", type="password")
+            
+            btn_login = st.form_submit_button("Entrar no Sistema")
+            
+        # Lógica de validação do login
+        if btn_login:
+            if tipo_acesso == "Administração":
+                # Credenciais fixas iniciais para o Admin (podem ser aprimoradas depois)
+                if usuario == "admin" and senha == "imla2026":
+                    st.session_state["logado"] = True
+                    st.session_state["perfil"] = "Admin"
+                    st.session_state["nome_usuario"] = "Administrador Geral"
+                    st.rerun()
+                else:
+                    st.error("Credenciais de administrador incorretas.")
+            
+            elif tipo_acesso == "Equipe (Núcleos)":
+                banco = carregar_banco_json()
+                usuarios = banco.get("usuarios", {})
+                
+                if usuario in usuarios:
+                    dados_user = usuarios[usuario]
+                    if verificar_senha(senha, dados_user["salt"], dados_user["hash"]):
+                        st.session_state["logado"] = True
+                        st.session_state["perfil"] = "Equipe"
+                        st.session_state["nome_usuario"] = usuario
+                        st.session_state["nucleo"] = dados_user.get("nucleo", "Geral")
+                        st.rerun()
+                    else:
+                        st.error("Senha incorreta.")
+                else:
+                    st.error("Usuário não encontrado. Solicite seu cadastro à Administração.")
+                    
+            elif tipo_acesso == "Padrinho / Madrinha":
+                if usuario.strip():
+                    st.session_state["logado"] = True
+                    st.session_state["perfil"] = "Padrinho"
+                    st.session_state["nome_usuario"] = usuario.strip().title()
+                    st.rerun()
+                else:
+                    st.error("Por favor, insira seu nome para continuar.")
+        
+        # Área oculta para criar os primeiros usuários da equipe (útil durante o desenvolvimento)
+        st.write("")
+        with st.expander("🛠️ Primeiro Acesso / Cadastro de Equipe"):
+            with st.form("form_cadastro"):
+                novo_user = st.text_input("Novo Usuário")
+                nova_senha = st.text_input("Nova Senha", type="password")
+                novo_nucleo = st.selectbox("Núcleo de Atuação", ["Comunicação", "Pedagógico", "Administrativo", "Apoio"])
+                btn_cadastrar = st.form_submit_button("Cadastrar Membro")
+                
+                if btn_cadastrar:
+                    if novo_user and nova_senha:
+                        sucesso, msg = registrar_usuario_equipe(novo_user, nova_senha, novo_nucleo)
+                        if sucesso:
+                            st.success(msg)
+                        else:
+                            st.error(msg)
+                    else:
+                        st.warning("Preencha todos os campos para cadastrar.")
