@@ -437,3 +437,258 @@ def main():
 # ==========================================
 if __name__ == "__main__":
     main()
+    # ==========================================
+# 9. MÓDULOS DA INTRANET (BLOCO 4)
+# ==========================================
+
+def inicializar_chaves_banco():
+    """Garante que as chaves da Intranet existam no banco."""
+    banco = carregar_banco_json()
+    modificado = False
+    for chave in ["feed", "tarefas", "solicitacoes"]:
+        if chave not in banco:
+            banco[chave] = []
+            modificado = True
+    if modificado:
+        salvar_banco_json(banco)
+    return banco
+
+def modulo_feed(nucleo_usuario):
+    """Renderiza um feed de mensagens minimalista."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Mural de Comunicação</h3>", unsafe_allow_html=True)
+    banco = inicializar_chaves_banco()
+    
+    # Formulário de nova postagem
+    with st.form("form_novo_post", clear_on_submit=True):
+        mensagem = st.text_area("Nova mensagem", height=80, label_visibility="collapsed", placeholder="Compartilhe uma atualização com a equipe...")
+        col_btn1, col_btn2 = st.columns([4, 1])
+        with col_btn2:
+            submit_post = st.form_submit_button("Publicar")
+            
+        if submit_post and mensagem.strip():
+            novo_post = {
+                "id": str(uuid.uuid4())[:8],
+                "autor": st.session_state["nome_usuario"],
+                "nucleo": nucleo_usuario,
+                "mensagem": mensagem.strip(),
+                "data": str(agora_br().strftime("%d/%m/%Y %H:%M"))
+            }
+            banco["feed"].insert(0, novo_post) # Adiciona no topo
+            salvar_banco_json(banco)
+            st.rerun()
+
+    st.write("---")
+    
+    # Exibição das postagens (Filtrando por núcleo ou gerais)
+    feed_visivel = [p for p in banco["feed"] if p["nucleo"] in [nucleo_usuario, "Geral", "Comunicação", "Administrativo", "Apoio"]]
+    
+    if not feed_visivel:
+        st.markdown("<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>Nenhuma atualização recente.</p>", unsafe_allow_html=True)
+    
+    for post in feed_visivel:
+        st.markdown(f"""
+        <div style="padding: 12px; border-left: 3px solid #ab875f; background-color: #fcfcfc; margin-bottom: 10px; border-radius: 0 4px 4px 0;">
+            <p style="margin: 0; font-size: 13px; color: #2c3e50;">{post['mensagem']}</p>
+            <p style="margin: 5px 0 0 0; font-size: 10px; color: #95a5a6; font-weight: 600; text-transform: uppercase;">
+                {post['autor']} • {post['data']} <span style="background-color: #253a58; color: white; padding: 2px 6px; border-radius: 10px; margin-left: 5px;">{post['nucleo']}</span>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def modulo_kanban(nucleo_usuario):
+    """Renderiza um Kanban elegante para controle de tarefas."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Painel de Tarefas</h3>", unsafe_allow_html=True)
+    banco = inicializar_chaves_banco()
+    
+    # Filtra tarefas do núcleo
+    tarefas_nucleo = [t for t in banco["tarefas"] if t["nucleo"] == nucleo_usuario]
+    
+    with st.expander("➕ Adicionar Nova Tarefa"):
+        with st.form("form_nova_tarefa", clear_on_submit=True):
+            titulo = st.text_input("Título da Tarefa")
+            desc = st.text_area("Descrição (opcional)", height=60)
+            col_t1, col_t2 = st.columns(2)
+            responsavel = col_t1.text_input("Responsável (opcional)")
+            prioridade = col_t2.selectbox("Prioridade", ["Baixa", "Média", "Alta"])
+            submit_tarefa = st.form_submit_button("Criar Tarefa")
+            
+            if submit_tarefa and titulo.strip():
+                nova_tarefa = {
+                    "id": str(uuid.uuid4())[:8],
+                    "titulo": titulo.strip(),
+                    "descricao": desc.strip(),
+                    "responsavel": responsavel.strip() or "Não atribuído",
+                    "prioridade": prioridade,
+                    "status": "A Fazer",
+                    "nucleo": nucleo_usuario
+                }
+                banco["tarefas"].append(nova_tarefa)
+                salvar_banco_json(banco)
+                st.rerun()
+
+    # Layout do Kanban
+    col_todo, col_doing, col_done = st.columns(3)
+    status_map = {"A Fazer": col_todo, "Em Andamento": col_doing, "Concluído": col_done}
+    cores_pri = {"Baixa": "#a8cf45", "Média": "#ffc713", "Alta": "#ff81ba"}
+
+    for status, coluna in status_map.items():
+        with coluna:
+            st.markdown(f"""
+            <div style="background-color: #253a58; color: white; padding: 6px; text-align: center; border-radius: 4px; margin-bottom: 10px;">
+                <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">{status}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            tarefas_status = [t for t in tarefas_nucleo if t["status"] == status]
+            for t in tarefas_status:
+                with st.container():
+                    st.markdown(f"""
+                    <div style="border: 1px solid #eaeaea; padding: 10px; border-radius: 6px; margin-bottom: 8px; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                        <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #2c3e50;">{t['titulo']}</p>
+                        <p style="margin: 0 0 6px 0; font-size: 11px; color: #7f8c8d;">{t['descricao'][:60]}{'...' if len(t['descricao'])>60 else ''}</p>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 9px; color: #95a5a6; text-transform: uppercase;">👤 {t['responsavel'][:10]}</span>
+                            <span style="font-size: 9px; font-weight: bold; color: {cores_pri[t['prioridade']]};">• {t['prioridade']}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Controles de movimento minimalistas
+                    c1, c2, c3 = st.columns([1,1,1])
+                    if status != "A Fazer":
+                        if c1.button("⏪", key=f"back_{t['id']}", help="Mover para trás"):
+                            t["status"] = "A Fazer" if status == "Em Andamento" else "Em Andamento"
+                            salvar_banco_json(banco)
+                            st.rerun()
+                    if c2.button("🗑️", key=f"del_{t['id']}", help="Excluir tarefa"):
+                        banco["tarefas"] = [x for x in banco["tarefas"] if x["id"] != t["id"]]
+                        salvar_banco_json(banco)
+                        st.rerun()
+                    if status != "Concluído":
+                        if c3.button("⏩", key=f"fwd_{t['id']}", help="Mover para frente"):
+                            t["status"] = "Em Andamento" if status == "A Fazer" else "Concluído"
+                            salvar_banco_json(banco)
+                            st.rerun()
+
+
+def modulo_solicitacoes(nucleo_usuario):
+    """Renderiza área para registrar e acompanhar solicitações."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Solicitações Internas</h3>", unsafe_allow_html=True)
+    banco = inicializar_chaves_banco()
+    
+    with st.form("form_solicitacao", clear_on_submit=True):
+        tipo_solicitacao = st.selectbox("Tipo de Solicitação", ["Material/Compra", "Suporte Técnico", "Criação de Design/Mídia", "Outros"])
+        detalhes = st.text_area("Detalhes do Pedido", height=80)
+        btn_solicitar = st.form_submit_button("Enviar Solicitação")
+        
+        if btn_solicitar and detalhes.strip():
+            nova_req = {
+                "id": str(uuid.uuid4())[:8],
+                "solicitante": st.session_state["nome_usuario"],
+                "nucleo_origem": nucleo_usuario,
+                "tipo": tipo_solicitacao,
+                "detalhes": detalhes.strip(),
+                "status": "Pendente",
+                "data": str(agora_br().strftime("%d/%m/%Y"))
+            }
+            banco["solicitacoes"].append(nova_req)
+            salvar_banco_json(banco)
+            st.success("Solicitação enviada!")
+            st.rerun()
+            
+    st.write("---")
+    st.markdown("<h4 style='font-size: 13px; color: #7f8c8d; text-transform: uppercase;'>Minhas Solicitações Ativas</h4>", unsafe_allow_html=True)
+    
+    minhas_reqs = [s for s in banco["solicitacoes"] if s["nucleo_origem"] == nucleo_usuario and s["status"] != "Arquivada"]
+    if not minhas_reqs:
+        st.markdown("<p style='font-size: 12px; color: #bdc3c7;'>Nenhuma solicitação pendente.</p>", unsafe_allow_html=True)
+    else:
+        for req in minhas_reqs:
+            cor_status = "#ab875f" if req["status"] == "Pendente" else "#a8cf45"
+            st.markdown(f"""
+            <div style="font-size: 12px; padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                <strong>{req['tipo']}</strong> — {req['detalhes'][:50]}...
+                <br>
+                <span style="font-size: 10px; color: {cor_status}; font-weight: bold;">Status: {req['status']}</span> 
+                <span style="font-size: 10px; color: #95a5a6;">| {req['data']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            # ==========================================
+# 10. MÓDULOS PEDAGÓGICOS (BLOCO 5)
+# ==========================================
+
+def modulo_matricula_apadrinhamento():
+    """Renderiza a gestão de matrículas e apadrinhamento."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Matrícula e Apadrinhamento</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; color: #7f8c8d;'>Gerencie as alocações de alunos nas salas e os vínculos com os padrinhos/madrinhas.</p>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.selectbox("Filtrar por Sala", ["Todas", "SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"], key="filtro_sala_mat")
+    with col2:
+        st.text_input("Buscar Aluno ou Padrinho", placeholder="Digite o nome...", key="busca_mat")
+        
+    st.write("---")
+    st.info("A tabela de matrículas será carregada do Google Sheets aqui, exibindo o status de apadrinhamento de forma compacta.")
+
+def modulo_turno_estendido():
+    """Renderiza a gestão do turno estendido."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Turno Estendido</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; color: #7f8c8d;'>Controle de frequência e atividades do contraturno.</p>", unsafe_allow_html=True)
+    
+    st.date_input("Data do Registro", value=agora_br().date(), key="data_te")
+    
+    st.markdown("""
+    <div style="border: 1px solid #eaeaea; padding: 12px; border-radius: 6px; background-color: #fcfcfc;">
+        <p style="font-size: 12px; margin: 0; color: #2c3e50; font-weight: 600;">Lista de Presença Rápida</p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.warning("Integração com a base de dados do Turno Estendido em desenvolvimento.")
+
+def modulo_tabua_mare():
+    """Renderiza a avaliação pedagógica (Tábua da Maré)."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Tábua da Maré (Alfabetização)</h3>", unsafe_allow_html=True)
+    
+    col_t1, col_t2 = st.columns([2, 1])
+    with col_t1:
+        st.selectbox("Selecionar Aluno", ["Selecione um aluno..."], key="aluno_mare")
+    with col_t2:
+        st.selectbox("Nível Atual", NIVEIS_ALF, key="nivel_mare")
+        
+    st.write("---")
+    st.markdown("<p style='font-size: 12px; font-weight: 700; color: #ab875f; text-transform: uppercase;'>Evidências de Aprendizagem</p>", unsafe_allow_html=True)
+    
+    # Exemplo de check-list minimalista baseado nas evidências do nível 1
+    for evidencia in EVIDENCIAS_POR_NIVEL["1. Pré-Silábico"]:
+        st.checkbox(evidencia, key=f"ev_{evidencia}")
+        
+    st.button("Salvar Avaliação", use_container_width=True)
+
+def modulo_indicadores():
+    """Renderiza os gráficos e métricas pedagógicas."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Indicadores de Desempenho</h3>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric(label="Total de Alunos", value="124")
+    with col2:
+        st.metric(label="Média de Frequência", value="92%")
+    with col3:
+        st.metric(label="Avanços na Maré", value="+15", delta="Este mês")
+        
+    st.write("---")
+    st.markdown("<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>Os gráficos dinâmicos serão renderizados aqui utilizando Plotly.</p>", unsafe_allow_html=True)
+
+def modulo_canal_apadrinhamento():
+    """Renderiza o canal de comunicação para Padrinhos/Madrinhas."""
+    st.markdown("<h3 style='color: #253a58; font-size: 16px; font-weight: 800;'>Canal do Apadrinhamento</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; color: #7f8c8d;'>Acompanhe o desenvolvimento do seu afilhado(a) e receba atualizações da equipe.</p>", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="padding: 15px; border-left: 3px solid #ab875f; background-color: #f9f9f9; border-radius: 0 6px 6px 0; margin-top: 15px;">
+        <h4 style="margin: 0 0 5px 0; font-size: 13px; color: #253a58;">Atualização Semanal - Sala Azul</h4>
+        <p style="margin: 0; font-size: 12px; color: #2c3e50;">Nesta semana, trabalhamos a coordenação motora fina e a identificação das vogais. As crianças demonstraram grande interesse nas atividades de pintura com os dedos!</p>
+        <p style="margin: 8px 0 0 0; font-size: 9px; color: #95a5a6; font-weight: bold; text-transform: uppercase;">Equipe Pedagógica • Ontem</p>
+    </div>
+    """, unsafe_allow_html=True)
