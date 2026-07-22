@@ -692,3 +692,63 @@ def modulo_canal_apadrinhamento():
         <p style="margin: 8px 0 0 0; font-size: 9px; color: #95a5a6; font-weight: bold; text-transform: uppercase;">Equipe Pedagógica • Ontem</p>
     </div>
     """, unsafe_allow_html=True)
+    # ==========================================
+# 11. POLIMENTO E AJUSTES FINAIS DE INTERFACE (BLOCO 6)
+# ==========================================
+
+def aplicar_polimento_visual():
+    """Injeta CSS adicional para garantir um design elegante, minimalista e com tipografia equilibrada."""
+    st.markdown("""
+    <style>
+    /* Ajustando a tipografia geral para proporções mais refinadas e menos invasivas */
+    html, body, [class*="css"] {
+        font-size: 13px !important;
+    }
+    
+    /* Cabeçalhos padronizados com a cor institucional principal */
+    h1 { font-size: 26px !important; color: #253a58 !important; letter-spacing: -0.5px; }
+    h2 { font-size: 20px !important; color: #253a58 !important; letter-spacing: -0.3px; }
+    h3 { font-size: 16px !important; color: #253a58 !important; }
+    
+    /* Estilização minimalista de botões */
+    div.stButton > button {
+        background-color: #253a58 !important;
+        color: #ffffff !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        border: 1px solid #253a58 !important;
+        transition: all 0.3s ease-in-out !important;
+    }
+    div.stButton > button:hover {
+        background-color: #ffffff !important;
+        color: #ab875f !important;
+        border: 1px solid #ab875f !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+    }
+    
+    /* Refinamento das abas de navegação (Tabs) */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 20px;
+        border-bottom: 1px solid #eaeaea;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        color: #7f8c8d;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        border-radius: 0;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #ab875f !important;
+        border-bottom: 2px solid #ab875f !important;
+        background-color: transparent !important;
+    }
+    
+    /* Ocultar elementos de UI padrão do Streamlit que poluem a tela */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
